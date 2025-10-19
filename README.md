@@ -1,6 +1,6 @@
 # aguitest
 
-Learning AGUI (Agent User Interaction Protocol) SDK with Pydantic AI
+Learning AG-UI (Agent User Interaction Protocol) SDK with Pydantic AI and FastAPI
 
 ## Prerequisites
 

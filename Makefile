@@ -1,4 +1,4 @@
-.PHONY: all clean help typecheck lint format check
+.PHONY: all clean help typecheck lint format check fix
 
 # Default target - runs the AG-UI agent server with auto-reload
 all: aguitest-venv
@@ -25,6 +25,9 @@ format: aguitest-venv
 # Run all checks (typecheck + lint)
 check: typecheck lint
 
+# Run checks and auto-fix issues (format after checking)
+fix: check format
+
 # Clean up the virtual environment
 clean:
 	rm -rf .venv aguitest-venv
@@ -35,6 +38,7 @@ help:
 	@echo "Available targets:"
 	@echo "  all              - Run agent_server.py with auto-reload (default)"
 	@echo "  check            - Run typecheck and lint"
+	@echo "  fix              - Run check then format (recommended before commit)"
 	@echo "  typecheck        - Run mypy type checking on all Python files"
 	@echo "  lint             - Run ruff linter on all Python files"
 	@echo "  format           - Run ruff formatter on all Python files"

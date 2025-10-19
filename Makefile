@@ -1,9 +1,18 @@
 .PHONY: all clean help typecheck lint format check fix
 
 # Default target - runs the AG-UI agent server with auto-reload
-all: aguitest-venv
-	@(sleep 2 && open http://127.0.0.1:8000/chat.html) &
+all: aguitest-venv dist
+	@(sleep 2 && open http://127.0.0.1:8000/) &
 	uv run uvicorn agent_server:app --host 127.0.0.1 --port 8000 --reload
+
+# Build TypeScript frontend
+dist: node_modules src/index.ts
+	npm run build
+
+# Install npm dependencies
+node_modules: package.json
+	npm install
+	@touch node_modules
 
 # Create the virtual environment from pyproject.toml
 aguitest-venv: pyproject.toml
@@ -28,10 +37,11 @@ check: typecheck lint
 # Run checks and auto-fix issues (format after checking)
 fix: check format
 
-# Clean up the virtual environment
+# Clean up build artifacts
 clean:
 	rm -rf .venv aguitest-venv
 	rm -rf uv.lock
+	rm -rf node_modules dist
 
 # Display help information
 help:

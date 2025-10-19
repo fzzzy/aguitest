@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 from typing import Optional, Any
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.ag_ui import SSE_CONTENT_TYPE
@@ -69,18 +70,15 @@ def evaluate_expression(expression: str) -> str:
 # Create FastAPI app
 app = FastAPI()
 
+# Mount static files and dist directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/dist", StaticFiles(directory="dist"), name="dist")
+
 
 @app.get("/")
 async def root():
-    """Root endpoint returning hello world"""
-    return {"message": "hello world"}
-
-
-@app.get("/chat.html", response_class=HTMLResponse)
-async def get_chat_html():
-    """Serve the chat.html file"""
-    chat_html_path = Path(__file__).parent / "chat.html"
-    return HTMLResponse(content=chat_html_path.read_text(), status_code=200)
+    """Serve the main chat interface"""
+    return FileResponse("static/index.html")
 
 
 @app.post("/message", response_model=MessageResponse)

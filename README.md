@@ -21,6 +21,7 @@ make
 ### Available Make Targets
 
 - `make` or `make all` - Run AG-UI agent server with auto-reload (default)
+- `make check` - Run typecheck and lint
 - `make fix` - Run typecheck and lint, reformat code with ruff and prettier
-- `make clean` - Remove virtual environment and lock file
+- `make clean` - Remove generated files
 - `make help` - Show all available targets

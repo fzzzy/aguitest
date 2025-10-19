@@ -23,6 +23,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@ag-ui/client": "^0.0.40",
     "@ag-ui/core": "^0.0.39"
   }
 }

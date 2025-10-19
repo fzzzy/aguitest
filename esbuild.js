@@ -2,7 +2,6 @@
 
 import esbuild from 'esbuild';
 import chokidar from 'chokidar';
-import fs from 'fs/promises';
 import { exec } from 'child_process';
 
 (async function main() {
@@ -22,7 +21,7 @@ import { exec } from 'child_process';
   await esbuild.build(buildConfig);
 
   // Generate TypeScript declarations
-  exec('node_modules/typescript/bin/tsc', (error, stdout, stderr) => {
+  exec('node_modules/typescript/bin/tsc', (error, _stdout, stderr) => {
     console.log('Generating type declarations...');
     if (error) {
       console.error(`Error generating type declarations: ${error}\n${stderr}`);

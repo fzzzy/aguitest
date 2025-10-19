@@ -23,9 +23,10 @@ function scrollToBottom(): void {
   }
 }
 
+
 function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-spacer")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const messageDiv = document.createElement("div");
   messageDiv.className = `message ${role}`;
 
@@ -47,7 +48,7 @@ function addMessage(role: "user" | "assistant", content: string): HTMLElement {
 
 function addTypingIndicator(): void {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-spacer")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const messageDiv = document.createElement("div");
   messageDiv.className = "message assistant";
   messageDiv.id = "typing-indicator";
@@ -76,7 +77,7 @@ function removeTypingIndicator(): void {
 
 function showError(message: string): void {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-spacer")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const errorDiv = document.createElement("div");
   errorDiv.className = "error-message";
   errorDiv.textContent = "Error: " + message;
@@ -89,7 +90,7 @@ function addToolMessage(
   isResult: boolean = false
 ): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-spacer")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const toolDiv = document.createElement("div");
   toolDiv.className = isResult ? "tool-message tool-result" : "tool-message";
   toolDiv.innerHTML = content;

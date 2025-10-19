@@ -23,7 +23,6 @@ function scrollToBottom(): void {
   }
 }
 
-
 function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
   const spacer = document.getElementById("scroll-anchor")!;

@@ -20,4 +20,4 @@ dev = [
 ]
 
 [tool.mypy]
-mypy_path = "../stubs"
+mypy_path = "stubs"

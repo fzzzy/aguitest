@@ -8,10 +8,10 @@ import { exec } from 'child_process';
   const isServe = process.argv.includes('--serve');
 
   const buildConfig = {
-    entryPoints: ['./src/index.ts'],
+    entryPoints: ['./index.ts'],
     bundle: true,
     sourcemap: true,
-    outdir: 'dist',
+    outdir: '../dist',
     format: 'esm',
     target: 'es2022',
     logLevel: 'info',
@@ -37,7 +37,7 @@ import { exec } from 'child_process';
     console.log('Starting watch mode...');
     let ctx = await esbuild.context(buildConfig);
 
-    let watcher = chokidar.watch(['src'], {
+    let watcher = chokidar.watch(['.'], {
       ignored: /(^|[\/\\])\../,
       persistent: true,
     });

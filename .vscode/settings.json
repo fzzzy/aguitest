@@ -1,6 +1,6 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/python/aguitest-venv/bin/python",
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/stubs"
+    "${workspaceFolder}/python/stubs"
   ]
 }

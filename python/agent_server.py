@@ -35,10 +35,13 @@ def evaluate_expression(expression: str) -> str:
     - "10 ** 2" returns 100
     - "15 % 4" returns 3
     - "int(3.7)" returns 3
+    - "1 / 0" returns inf (infinity)
     """
     try:
         result = simple_eval(expression)
         return str(result)
+    except ZeroDivisionError:
+        return str(float("inf"))
     except Exception as e:
         return f"Error evaluating expression: {str(e)}"
 

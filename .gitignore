@@ -7,7 +7,7 @@ wheels/
 
 # TypeScript/JavaScript build output
 dist/
-node_modules/
+src/node_modules/
 *.tsbuildinfo
 
 # Tool caches
@@ -16,12 +16,12 @@ node_modules/
 
 # Virtual environments
 .venv/
-aguitest-venv
+python/aguitest-venv
 python/.venv/
 venv/
 ENV/
 env/
-uv.lock
+python/uv.lock
 
 # Project directories
 var/

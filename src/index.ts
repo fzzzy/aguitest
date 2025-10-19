@@ -10,6 +10,9 @@ import {
   type ToolCallResultEvent,
   type RunStartedEvent,
   type RunFinishedEvent,
+  type RunErrorEvent,
+  type StepStartedEvent,
+  type StepFinishedEvent,
 } from "@ag-ui/core";
 
 // Type for parsed SSE events
@@ -22,6 +25,9 @@ type AGUIEvent =
   | ToolCallEndEvent
   | ToolCallResultEvent
   | RunStartedEvent
+  | RunErrorEvent
+  | StepStartedEvent
+  | StepFinishedEvent
   | (RunFinishedEvent & { assistantMessageId?: string });
 
 let lastMessageId: string | null = null; // Track the last message ID in the chain
@@ -221,6 +227,19 @@ async function sendMessage(): Promise<void> {
           const resultText = event.content || "No result";
           const resultContent = `<div class="tool-call">✅ Tool result</div><div class="tool-args">${resultText}</div>`;
           addToolMessage(resultContent, true);
+        } else if (event.type === EventType.RUN_ERROR) {
+          console.error("[Client] Run error:", event);
+          showError(
+            `Agent error: ${event.message || "Unknown error occurred"}`
+          );
+          eventSource.close();
+          isProcessing = false;
+          sendButton.disabled = false;
+          input.focus();
+        } else if (event.type === EventType.STEP_STARTED) {
+          console.log("[Client] Step started:", event.stepName);
+        } else if (event.type === EventType.STEP_FINISHED) {
+          console.log("[Client] Step finished:", event.stepName);
         } else if (event.type === EventType.RUN_FINISHED) {
           console.log("[Client] Run finished, closing EventSource");
 

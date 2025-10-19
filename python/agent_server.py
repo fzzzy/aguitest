@@ -1,18 +1,12 @@
 """AG-UI Agent Server using standard AG-UI protocol with agent.to_ag_ui()"""
 
 import os
-import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic_ai import Agent
 from simpleeval import simple_eval
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-if "AWS_DEFAULT_REGION" not in os.environ:
-    os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 
 # Create the Pydantic AI agent
 agent = Agent(
@@ -46,21 +40,16 @@ def evaluate_expression(expression: str) -> str:
         return f"Error evaluating expression: {str(e)}"
 
 
-# Create the AG-UI ASGI app from the agent
-ag_ui_app = agent.to_ag_ui()
-
-# Create FastAPI app for serving static files
 app = FastAPI()
 
-# Mount the AG-UI app at /agent
-app.mount("/agent", ag_ui_app)
 
-# Mount static files
 app.mount("/static", StaticFiles(directory="../static"), name="static")
 app.mount("/dist", StaticFiles(directory="../dist"), name="dist")
 
 
 @app.get("/")
 async def root():
-    """Serve the main chat interface"""
     return FileResponse("../static/index.html")
+
+
+app.mount("/agent", agent.to_ag_ui())

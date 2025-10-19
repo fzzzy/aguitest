@@ -6,6 +6,10 @@ dist/
 wheels/
 *.egg-info
 
+# Tool caches
+.ruff_cache/
+.mypy_cache/
+
 # Virtual environments
 .venv/
 aguitest-venv

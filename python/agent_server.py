@@ -4,10 +4,9 @@ import os
 import logging
 import uuid
 import json
-from pathlib import Path
 from typing import Optional, Any
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -15,8 +14,8 @@ from pydantic_ai.ag_ui import SSE_CONTENT_TYPE
 from ag_ui.core import RunAgentInput
 from simpleeval import simple_eval
 
-from database import init_db, save_message, get_message, reconstruct_history
-from streaming import stream_agent_events
+from agui_database import init_db, save_message, get_message, reconstruct_history
+from agui_streaming import stream_agent_events
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,14 +70,14 @@ def evaluate_expression(expression: str) -> str:
 app = FastAPI()
 
 # Mount static files and dist directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/dist", StaticFiles(directory="dist"), name="dist")
+app.mount("/static", StaticFiles(directory="../static"), name="static")
+app.mount("/dist", StaticFiles(directory="../dist"), name="dist")
 
 
 @app.get("/")
 async def root():
     """Serve the main chat interface"""
-    return FileResponse("static/index.html")
+    return FileResponse("../static/index.html")
 
 
 @app.post("/message", response_model=MessageResponse)

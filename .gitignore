@@ -17,9 +17,11 @@ node_modules/
 # Virtual environments
 .venv/
 aguitest-venv
+python/.venv/
 venv/
 ENV/
 env/
+uv.lock
 
 # Project directories
 var/

@@ -1,9 +1,16 @@
-.PHONY: all clean help typecheck lint format check fix
+.PHONY: all dev clean help typecheck lint format check fix
 
 # Default target - runs the AG-UI agent server with auto-reload
 all: aguitest-venv dist
 	@(sleep 2 && open http://127.0.0.1:8000/) &
-	uv run uvicorn agent_server:app --host 127.0.0.1 --port 8000 --reload
+	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8000 --reload
+
+# Development mode - runs server with auto-reload AND TypeScript watch mode
+dev: aguitest-venv node_modules
+	@echo "Starting TypeScript watch mode and Python server..."
+	@(npm run watch &) && \
+	(sleep 2 && open http://127.0.0.1:8000/) & \
+	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8000 --reload
 
 # Build TypeScript frontend
 dist: node_modules src/index.ts
@@ -15,21 +22,23 @@ node_modules: package.json
 	@touch node_modules
 
 # Create the virtual environment from pyproject.toml
-aguitest-venv: pyproject.toml
-	uv sync
+aguitest-venv: python/pyproject.toml
+	cd python && uv sync
 	@touch aguitest-venv
 
 # Run type checking with mypy
 typecheck: aguitest-venv
-	uv run mypy *.py
+	cd python && uv run mypy *.py
 
 # Run ruff linter
-lint: aguitest-venv
-	uv run ruff check *.py
+lint: aguitest-venv node_modules
+	cd python && uv run ruff check *.py
+	npx eslint src/**/*.ts
 
 # Run ruff formatter
-format: aguitest-venv
-	uv run ruff format *.py
+format: aguitest-venv node_modules
+	cd python && uv run ruff format *.py
+	npx prettier --write src/**/*.ts
 
 # Run all checks (typecheck + lint)
 check: typecheck lint
@@ -47,6 +56,7 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  all              - Run agent_server.py with auto-reload (default)"
+	@echo "  dev              - Run server + TypeScript watch mode for development"
 	@echo "  check            - Run typecheck and lint"
 	@echo "  fix              - Run check then format (recommended before commit)"
 	@echo "  typecheck        - Run mypy type checking on all Python files"

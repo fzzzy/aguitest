@@ -8,7 +8,7 @@ from pydantic_ai import Agent
 from pydantic_ai.ag_ui import run_ag_ui, SSE_CONTENT_TYPE
 from ag_ui.core import RunAgentInput
 
-from database import save_message
+from agui_database import save_message
 
 logger = logging.getLogger(__name__)
 

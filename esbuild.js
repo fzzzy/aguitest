@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-const esbuild = require('esbuild');
-const chokidar = require('chokidar');
-const fs = require('fs/promises');
-const { exec } = require('child_process');
+import esbuild from 'esbuild';
+import chokidar from 'chokidar';
+import fs from 'fs/promises';
+import { exec } from 'child_process';
 
 (async function main() {
   const isServe = process.argv.includes('--serve');

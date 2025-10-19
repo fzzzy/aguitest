@@ -1,13 +1,48 @@
 // AG-UI Chat Frontend - TypeScript
+import {
+  EventType,
+  type TextMessageStartEvent,
+  type TextMessageContentEvent,
+  type TextMessageEndEvent,
+  type ToolCallStartEvent,
+  type ToolCallArgsEvent,
+  type ToolCallEndEvent,
+  type ToolCallResultEvent,
+  type RunStartedEvent,
+  type RunFinishedEvent,
+} from "@ag-ui/core";
+
+// Type for parsed SSE events
+type AGUIEvent =
+  | TextMessageStartEvent
+  | TextMessageContentEvent
+  | TextMessageEndEvent
+  | ToolCallStartEvent
+  | ToolCallArgsEvent
+  | ToolCallEndEvent
+  | ToolCallResultEvent
+  | RunStartedEvent
+  | (RunFinishedEvent & { assistantMessageId?: string });
 
 let lastMessageId: string | null = null; // Track the last message ID in the chain
 let currentAssistantMessage: HTMLElement | null = null;
 let currentToolCall: HTMLElement | null = null;
-let toolCallsMap: Record<string, { name: string; args: string; element: HTMLElement }> = {};
+let toolCallsMap: Record<
+  string,
+  { name: string; args: string; element: HTMLElement }
+> = {};
 let isProcessing = false;
+
+function scrollToBottom(): void {
+  const anchor = document.getElementById("scroll-anchor");
+  if (anchor) {
+    anchor.scrollIntoView({ behavior: "auto", block: "end" });
+  }
+}
 
 function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const messageDiv = document.createElement("div");
   messageDiv.className = `message ${role}`;
 
@@ -21,14 +56,15 @@ function addMessage(role: "user" | "assistant", content: string): HTMLElement {
 
   messageDiv.appendChild(avatar);
   messageDiv.appendChild(contentDiv);
-  messagesDiv.appendChild(messageDiv);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.insertBefore(messageDiv, spacer);
+  scrollToBottom();
 
   return contentDiv;
 }
 
 function addTypingIndicator(): void {
   const messagesDiv = document.getElementById("messages")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const messageDiv = document.createElement("div");
   messageDiv.className = "message assistant";
   messageDiv.id = "typing-indicator";
@@ -44,8 +80,8 @@ function addTypingIndicator(): void {
 
   messageDiv.appendChild(avatar);
   messageDiv.appendChild(typingDiv);
-  messagesDiv.appendChild(messageDiv);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.insertBefore(messageDiv, spacer);
+  scrollToBottom();
 }
 
 function removeTypingIndicator(): void {
@@ -57,29 +93,25 @@ function removeTypingIndicator(): void {
 
 function showError(message: string): void {
   const messagesDiv = document.getElementById("messages")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const errorDiv = document.createElement("div");
   errorDiv.className = "error-message";
   errorDiv.textContent = "Error: " + message;
-  messagesDiv.appendChild(errorDiv);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.insertBefore(errorDiv, spacer);
+  scrollToBottom();
 }
 
-function addSystemMessage(message: string): void {
+function addToolMessage(
+  content: string,
+  isResult: boolean = false
+): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
-  const systemDiv = document.createElement("div");
-  systemDiv.className = "system-message";
-  systemDiv.textContent = message;
-  messagesDiv.appendChild(systemDiv);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
-function addToolMessage(content: string, isResult: boolean = false): HTMLElement {
-  const messagesDiv = document.getElementById("messages")!;
+  const spacer = document.getElementById("scroll-anchor")!;
   const toolDiv = document.createElement("div");
   toolDiv.className = isResult ? "tool-message tool-result" : "tool-message";
   toolDiv.innerHTML = content;
-  messagesDiv.appendChild(toolDiv);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.insertBefore(toolDiv, spacer);
+  scrollToBottom();
   return toolDiv;
 }
 
@@ -136,25 +168,29 @@ async function sendMessage(): Promise<void> {
     eventSource.onmessage = function (e) {
       console.log("[Client] Received message:", e.data);
       try {
-        const event = JSON.parse(e.data);
+        const event = JSON.parse(e.data) as AGUIEvent;
         console.log("[Client] Parsed event type:", event.type, event);
 
-        if (event.type === "RUN_STARTED") {
+        if (event.type === EventType.RUN_STARTED) {
           console.log("[Client] Run started:", event.runId);
-          addSystemMessage("🔄 Run started: " + event.runId);
-        } else if (event.type === "TEXT_MESSAGE_START") {
+          // Don't display RUN_STARTED in UI
+        } else if (event.type === EventType.TEXT_MESSAGE_START) {
           console.log("[Client] Starting assistant message");
           removeTypingIndicator();
           currentAssistantMessage = addMessage("assistant", "");
           assistantMessageStarted = true;
-        } else if (event.type === "TEXT_MESSAGE_CONTENT" && currentAssistantMessage) {
+        } else if (
+          event.type === EventType.TEXT_MESSAGE_CONTENT &&
+          currentAssistantMessage
+        ) {
           console.log("[Client] Adding delta:", event.delta);
           const delta = event.delta || "";
           currentAssistantMessage.innerHTML += delta.replace(/\n/g, "<br>");
-        } else if (event.type === "TEXT_MESSAGE_END") {
+          scrollToBottom();
+        } else if (event.type === EventType.TEXT_MESSAGE_END) {
           console.log("[Client] Message ended");
           currentAssistantMessage = null;
-        } else if (event.type === "TOOL_CALL_START") {
+        } else if (event.type === EventType.TOOL_CALL_START) {
           console.log("[Client] Tool call started:", event.toolCallName);
           const toolContent = `<div class="tool-call">🔧 Calling tool: ${event.toolCallName}</div><div class="tool-args" id="tool-args-${event.toolCallId}">Arguments: </div>`;
           currentToolCall = addToolMessage(toolContent);
@@ -163,35 +199,38 @@ async function sendMessage(): Promise<void> {
             args: "",
             element: currentToolCall,
           };
-        } else if (event.type === "TOOL_CALL_ARGS" && event.toolCallId in toolCallsMap) {
-          console.log("[Client] Tool call args delta:", event.delta);
-          toolCallsMap[event.toolCallId].args += event.delta || "";
-          const argsDiv = document.getElementById("tool-args-" + event.toolCallId);
-          if (argsDiv) {
-            argsDiv.textContent = "Arguments: " + toolCallsMap[event.toolCallId].args;
+        } else if (event.type === EventType.TOOL_CALL_ARGS) {
+          const typedEvent = event as ToolCallArgsEvent;
+          if (typedEvent.toolCallId in toolCallsMap) {
+            console.log("[Client] Tool call args delta:", typedEvent.delta);
+            toolCallsMap[typedEvent.toolCallId].args += typedEvent.delta || "";
+            const argsDiv = document.getElementById(
+              "tool-args-" + typedEvent.toolCallId
+            );
+            if (argsDiv) {
+              argsDiv.textContent =
+                "Arguments: " + toolCallsMap[typedEvent.toolCallId].args;
+              scrollToBottom();
+            }
           }
-        } else if (event.type === "TOOL_CALL_END") {
+        } else if (event.type === EventType.TOOL_CALL_END) {
           console.log("[Client] Tool call ended:", event.toolCallId);
           currentToolCall = null;
-        } else if (event.type === "TOOL_CALL_RESULT") {
+        } else if (event.type === EventType.TOOL_CALL_RESULT) {
           console.log("[Client] Tool call result:", event.toolCallId);
-          let resultText = "";
-          if (event.content && typeof event.content === "string") {
-            resultText = event.content;
-          } else if (event.content && Array.isArray(event.content)) {
-            resultText = event.content.map((c: any) => c.text || JSON.stringify(c)).join("\n");
-          } else {
-            resultText = JSON.stringify(event.content || event.result || "No result");
-          }
+          const resultText = event.content || "No result";
           const resultContent = `<div class="tool-call">✅ Tool result</div><div class="tool-args">${resultText}</div>`;
           addToolMessage(resultContent, true);
-        } else if (event.type === "RUN_FINISHED") {
+        } else if (event.type === EventType.RUN_FINISHED) {
           console.log("[Client] Run finished, closing EventSource");
 
           // Update lastMessageId to the assistant's message for proper chaining
           if (event.assistantMessageId) {
             lastMessageId = event.assistantMessageId;
-            console.log("[Client] Updated lastMessageId to assistant message:", lastMessageId);
+            console.log(
+              "[Client] Updated lastMessageId to assistant message:",
+              lastMessageId
+            );
           }
 
           eventSource.close();
@@ -236,7 +275,9 @@ function handleKeyPress(event: KeyboardEvent): void {
 
 // Initialize when DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
-  const messageInput = document.getElementById("messageInput") as HTMLInputElement;
+  const messageInput = document.getElementById(
+    "messageInput"
+  ) as HTMLInputElement;
   const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
 
   messageInput.addEventListener("keypress", handleKeyPress);

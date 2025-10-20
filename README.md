@@ -1,5 +1,7 @@
 # aguitest
 
+<img width="1083" height="659" alt="aguitest" src="https://github.com/user-attachments/assets/f047235f-4309-4cdc-aa56-4119ec992c02" />
+
 Learning AG-UI (Agent User Interaction Protocol) SDK with Pydantic AI and FastAPI
 
 ## Prerequisites

@@ -11,7 +11,6 @@ let toolCallsMap: Record<
 > = {};
 let isProcessing = false;
 
-// Create the HttpAgent
 const agent = new HttpAgent({
   url: "/agent",
 });

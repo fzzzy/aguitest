@@ -3,17 +3,12 @@
 # Set UV to use aguitest-venv instead of .venv
 export UV_PROJECT_ENVIRONMENT = aguitest-venv
 
-# Default target - runs the AG-UI agent server with auto-reload
-all: python/aguitest-venv dist
-	@(sleep 2 && open http://127.0.0.1:8000/) &
-	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8000 --reload
-
 # Development mode - runs server with auto-reload AND TypeScript watch mode
-dev: python/aguitest-venv src/node_modules
+all: python/aguitest-venv src/node_modules
 	@echo "Starting TypeScript watch mode and Python server..."
 	@(cd src && npm run watch &) && \
-	(sleep 2 && open http://127.0.0.1:8000/) & \
-	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8000 --reload
+	(sleep 2 && open http://127.0.0.1:8999/) & \
+	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8999 --reload
 
 # Build TypeScript frontend
 dist: src/node_modules src/index.ts

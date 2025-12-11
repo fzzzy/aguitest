@@ -2,5 +2,12 @@
   "python.defaultInterpreterPath": "${workspaceFolder}/python/aguitest-venv/bin/python",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/python/stubs"
+  ],
+  "python-envs.pythonProjects": [
+    {
+      "path": "",
+      "envManager": "ms-python.python:system",
+      "packageManager": "ms-python.python:pip"
+    }
   ]
 }

@@ -228,3 +228,103 @@ body {
     text-align: center;
     font-size: 12px;
 }
+
+.custom-event {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 4px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-size: 14px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.custom-event-name {
+    color: #1565c0;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.custom-event-value {
+    color: #1976d2;
+    margin-left: 20px;
+    white-space: pre-wrap;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.deferred-approval {
+    background: #fff8e1;
+    border-left: 4px solid #ffa726;
+}
+
+.approval-item {
+    padding: 12px;
+    margin: 8px 0;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.approval-item.approved {
+    background: #e8f5e9;
+    border-color: #4caf50;
+}
+
+.approval-item.rejected {
+    background: #ffebee;
+    border-color: #f44336;
+}
+
+.approval-tool-name {
+    font-weight: 600;
+    color: #e65100;
+    margin-bottom: 4px;
+}
+
+.approval-args {
+    color: #666;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.approval-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.approve-btn, .reject-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.approve-btn {
+    background: #4caf50;
+    color: white;
+}
+
+.approve-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.reject-btn {
+    background: #f44336;
+    color: white;
+}
+
+.reject-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
+.approve-btn:disabled, .reject-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

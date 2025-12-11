@@ -1,7 +1,7 @@
-// AG-UI Chat Frontend using @ag-ui/client HttpAgent
-import { HttpAgent, type Message } from "@ag-ui/client";
 
-// State
+import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
+
+
 let messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
 let currentToolCall: HTMLElement | null = null;
@@ -11,9 +11,253 @@ let toolCallsMap: Record<
 > = {};
 let isProcessing = false;
 
+
 const agent = new HttpAgent({
   url: "/agent",
 });
+
+
+interface SubscriberOptions {
+  logPrefix?: string;
+  onFinished?: () => void;
+  includeToolCallHandlers?: boolean;
+  includeCustomEventHandler?: boolean;
+}
+
+
+function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
+  const {
+    logPrefix = "",
+    onFinished,
+    includeToolCallHandlers = true,
+    includeCustomEventHandler = true,
+  } = options;
+
+  const input = document.getElementById("messageInput") as HTMLInputElement;
+  const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+
+  const subscriber: AgentSubscriber = {
+    onRunStartedEvent: (_params) => {
+      console.log(`[Client] Run started${logPrefix}`);
+    },
+
+    onTextMessageStartEvent: (_params) => {
+      console.log("[Client] Starting assistant message");
+      removeTypingIndicator();
+      currentAssistantMessage = addMessage("assistant", "");
+    },
+
+    onTextMessageContentEvent: (params) => {
+      if (currentAssistantMessage && params.event.delta) {
+        console.log("[Client] Adding delta:", params.event.delta);
+        currentAssistantMessage.innerHTML += params.event.delta.replace(
+          /\n/g,
+          "<br>"
+        );
+        scrollToBottom();
+      }
+    },
+
+    onTextMessageEndEvent: (params) => {
+      console.log("[Client] Message ended");
+      if (currentAssistantMessage) {
+        messages.push({
+          id: params.event.messageId,
+          role: "assistant",
+          content: currentAssistantMessage.textContent || "",
+        });
+      }
+      currentAssistantMessage = null;
+    },
+
+    onRunErrorEvent: (params) => {
+      console.error("[Client] Run error:", params.event);
+      showError(
+        `Agent error: ${params.event.message || "Unknown error occurred"}`
+      );
+      isProcessing = false;
+      sendButton.disabled = false;
+      input.focus();
+    },
+
+    onRunFinishedEvent: (_params) => {
+      console.log(`[Client] Run finished${logPrefix}`);
+      removeTypingIndicator();
+      isProcessing = false;
+      sendButton.disabled = false;
+      input.focus();
+      onFinished?.();
+    },
+  };
+
+  if (includeToolCallHandlers) {
+    subscriber.onToolCallStartEvent = (params) => {
+      console.log("[Client] Tool call started:", params.event.toolCallName);
+      const toolContent = `<div class="tool-call">🔧 Calling tool: ${params.event.toolCallName}</div><div class="tool-args" id="tool-args-${params.event.toolCallId}">Arguments: </div>`;
+      currentToolCall = addToolMessage(toolContent);
+      toolCallsMap[params.event.toolCallId] = {
+        name: params.event.toolCallName,
+        args: "",
+        element: currentToolCall,
+      };
+    };
+
+    subscriber.onToolCallArgsEvent = (params) => {
+      const toolCallId = params.event.toolCallId;
+      if (toolCallId in toolCallsMap && params.event.delta) {
+        console.log("[Client] Tool call args delta:", params.event.delta);
+        toolCallsMap[toolCallId].args += params.event.delta;
+        const argsDiv = document.getElementById("tool-args-" + toolCallId);
+        if (argsDiv) {
+          argsDiv.textContent = "Arguments: " + toolCallsMap[toolCallId].args;
+          scrollToBottom();
+        }
+      }
+    };
+
+    subscriber.onToolCallEndEvent = (params) => {
+      console.log("[Client] Tool call ended:", params.event.toolCallId);
+      currentToolCall = null;
+    };
+
+    subscriber.onToolCallResultEvent = (params) => {
+      console.log("[Client] Tool call result:", params.event.toolCallId);
+      const resultText = params.event.content || "No result";
+      const resultContent = `<div class="tool-call">✅ Tool result</div><div class="tool-args">${resultText}</div>`;
+      addToolMessage(resultContent, true);
+    };
+
+    subscriber.onStepStartedEvent = (params) => {
+      console.log("[Client] Step started:", params.event.stepName);
+    };
+
+    subscriber.onStepFinishedEvent = (_params) => {
+      console.log("[Client] Step finished");
+    };
+  }
+
+  if (includeCustomEventHandler) {
+    subscriber.onCustomEvent = (params) => {
+      console.log("[Client] Custom event:", params.event);
+
+      // Handle instructions event - insert at the beginning (before user message)
+      if (params.event.name === "instructions") {
+        const customDiv = document.createElement("div");
+        customDiv.className = "custom-event";
+        customDiv.innerHTML = `<div class="custom-event-name">📜 ${params.event.name}</div><div class="custom-event-value">${typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2)}</div>`;
+        const messagesDiv = document.getElementById("messages")!;
+        messagesDiv.insertBefore(customDiv, messagesDiv.firstChild);
+        scrollToBottom();
+        return;
+      }
+
+      if (params.event.name === "deferred_tool_requests") {
+        if (!params.event.value || Object.keys(params.event.value).length === 0) {
+          return;
+        }
+
+        removeTypingIndicator();
+
+        const approvalDiv = document.createElement("div");
+        approvalDiv.className = "custom-event deferred-approval";
+
+        let approvalHTML = '<div class="custom-event-name">🔐 Tool Approval Required</div>';
+
+        for (const [callId, callInfo] of Object.entries(params.event.value as Record<string, any>)) {
+          const args = typeof callInfo.args === 'string' ? callInfo.args : JSON.stringify(callInfo.args);
+          approvalHTML += `
+            <div class="approval-item" data-call-id="${callId}">
+              <div class="approval-tool-name">Tool: ${callInfo.tool_name}</div>
+              <div class="approval-args">Arguments: ${args}</div>
+              <div class="approval-buttons">
+                <button class="approve-btn" data-call-id="${callId}">✓ Approve</button>
+                <button class="reject-btn" data-call-id="${callId}">✗ Reject</button>
+              </div>
+            </div>
+          `;
+        }
+
+        approvalDiv.innerHTML = approvalHTML;
+        const messagesDiv = document.getElementById("messages")!;
+        const spacer = document.getElementById("scroll-anchor")!;
+        messagesDiv.insertBefore(approvalDiv, spacer);
+        scrollToBottom();
+
+        const approvals: Record<string, boolean> = {};
+        const totalTools = Object.keys(params.event.value as Record<string, any>).length;
+        let approvedCount = 0;
+
+        const handleApproval = async (callId: string, approved: boolean) => {
+          approvals[callId] = approved;
+          approvedCount++;
+
+          const item = approvalDiv.querySelector(`[data-call-id="${callId}"]`) as HTMLElement;
+          item.querySelector('.approve-btn')!.setAttribute('disabled', 'true');
+          item.querySelector('.reject-btn')!.setAttribute('disabled', 'true');
+          item.classList.add(approved ? 'approved' : 'rejected');
+
+          if (approvedCount === totalTools) {
+            await continueWithApprovals(approvals);
+          }
+        };
+
+        approvalDiv.querySelectorAll('.approve-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            handleApproval((e.target as HTMLElement).dataset.callId!, true);
+          });
+        });
+
+        approvalDiv.querySelectorAll('.reject-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            handleApproval((e.target as HTMLElement).dataset.callId!, false);
+          });
+        });
+
+        return;
+      }
+
+      const customDiv = document.createElement("div");
+      customDiv.className = "custom-event";
+      customDiv.innerHTML = `<div class="custom-event-name">📌 ${params.event.name}</div><div class="custom-event-value">${typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2)}</div>`;
+      const messagesDiv = document.getElementById("messages")!;
+      const spacer = document.getElementById("scroll-anchor")!;
+      messagesDiv.insertBefore(customDiv, spacer);
+      scrollToBottom();
+    };
+  }
+
+  return subscriber;
+}
+
+
+async function continueWithApprovals(approvals: Record<string, boolean>): Promise<void> {
+  console.log("All tools processed, approvals:", approvals);
+
+  if (!agent.state) {
+    agent.state = {};
+  }
+  agent.state.deferred_tool_approvals = approvals;
+
+  addTypingIndicator();
+
+  try {
+    await agent.runAgent({}, createSubscriber({
+      logPrefix: " (with approvals)",
+      onFinished: () => {
+        delete agent.state!.deferred_tool_approvals;
+      },
+    }));
+  } catch (error: any) {
+    console.error("[Client] Error continuing with approvals:", error);
+    showError(error.message || "Failed to continue with approvals");
+    const input = document.getElementById("messageInput") as HTMLInputElement;
+    const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+    isProcessing = false;
+    sendButton.disabled = false;
+    input.focus();
+  }
+}
+
 
 function scrollToBottom(): void {
   const anchor = document.getElementById("scroll-anchor");
@@ -21,6 +265,7 @@ function scrollToBottom(): void {
     anchor.scrollIntoView({ behavior: "auto", block: "end" });
   }
 }
+
 
 function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
@@ -44,9 +289,9 @@ function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   return contentDiv;
 }
 
+
 function addTypingIndicator(): void {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-anchor")!;
   const messageDiv = document.createElement("div");
   messageDiv.className = "message assistant";
   messageDiv.id = "typing-indicator";
@@ -62,9 +307,10 @@ function addTypingIndicator(): void {
 
   messageDiv.appendChild(avatar);
   messageDiv.appendChild(typingDiv);
-  messagesDiv.insertBefore(messageDiv, spacer);
+  messagesDiv.appendChild(messageDiv);
   scrollToBottom();
 }
+
 
 function removeTypingIndicator(): void {
   const indicator = document.getElementById("typing-indicator");
@@ -72,6 +318,7 @@ function removeTypingIndicator(): void {
     indicator.remove();
   }
 }
+
 
 function showError(message: string): void {
   const messagesDiv = document.getElementById("messages")!;
@@ -82,6 +329,7 @@ function showError(message: string): void {
   messagesDiv.insertBefore(errorDiv, spacer);
   scrollToBottom();
 }
+
 
 function addToolMessage(
   content: string,
@@ -97,6 +345,7 @@ function addToolMessage(
   return toolDiv;
 }
 
+
 async function sendMessage(): Promise<void> {
   const input = document.getElementById("messageInput") as HTMLInputElement;
   const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
@@ -109,7 +358,6 @@ async function sendMessage(): Promise<void> {
   sendButton.disabled = true;
   input.value = "";
 
-  // Add user message to UI and state
   addMessage("user", messageText);
   messages.push({
     id: crypto.randomUUID(),
@@ -120,110 +368,9 @@ async function sendMessage(): Promise<void> {
   addTypingIndicator();
 
   try {
-    // Subscribe to agent events
-    const unsubscribe = agent.subscribe({
-      onRunStartedEvent: (_params) => {
-        console.log("[Client] Run started");
-      },
-
-      onTextMessageStartEvent: (_params) => {
-        console.log("[Client] Starting assistant message");
-        removeTypingIndicator();
-        currentAssistantMessage = addMessage("assistant", "");
-      },
-
-      onTextMessageContentEvent: (params) => {
-        if (currentAssistantMessage && params.event.delta) {
-          console.log("[Client] Adding delta:", params.event.delta);
-          currentAssistantMessage.innerHTML += params.event.delta.replace(
-            /\n/g,
-            "<br>"
-          );
-          scrollToBottom();
-        }
-      },
-
-      onTextMessageEndEvent: (params) => {
-        console.log("[Client] Message ended");
-        if (currentAssistantMessage) {
-          // Store the complete message
-          messages.push({
-            id: params.event.messageId,
-            role: "assistant",
-            content: currentAssistantMessage.textContent || "",
-          });
-        }
-        currentAssistantMessage = null;
-      },
-
-      onToolCallStartEvent: (params) => {
-        console.log("[Client] Tool call started:", params.event.toolCallName);
-        const toolContent = `<div class="tool-call">🔧 Calling tool: ${params.event.toolCallName}</div><div class="tool-args" id="tool-args-${params.event.toolCallId}">Arguments: </div>`;
-        currentToolCall = addToolMessage(toolContent);
-        toolCallsMap[params.event.toolCallId] = {
-          name: params.event.toolCallName,
-          args: "",
-          element: currentToolCall,
-        };
-      },
-
-      onToolCallArgsEvent: (params) => {
-        const toolCallId = params.event.toolCallId;
-        if (toolCallId in toolCallsMap && params.event.delta) {
-          console.log("[Client] Tool call args delta:", params.event.delta);
-          toolCallsMap[toolCallId].args += params.event.delta;
-          const argsDiv = document.getElementById("tool-args-" + toolCallId);
-          if (argsDiv) {
-            argsDiv.textContent = "Arguments: " + toolCallsMap[toolCallId].args;
-            scrollToBottom();
-          }
-        }
-      },
-
-      onToolCallEndEvent: (params) => {
-        console.log("[Client] Tool call ended:", params.event.toolCallId);
-        currentToolCall = null;
-      },
-
-      onToolCallResultEvent: (params) => {
-        console.log("[Client] Tool call result:", params.event.toolCallId);
-        const resultText = params.event.content || "No result";
-        const resultContent = `<div class="tool-call">✅ Tool result</div><div class="tool-args">${resultText}</div>`;
-        addToolMessage(resultContent, true);
-      },
-
-      onRunErrorEvent: (params) => {
-        console.error("[Client] Run error:", params.event);
-        showError(
-          `Agent error: ${params.event.message || "Unknown error occurred"}`
-        );
-        isProcessing = false;
-        sendButton.disabled = false;
-        input.focus();
-      },
-
-      onStepStartedEvent: (params) => {
-        console.log("[Client] Step started:", params.event.stepName);
-      },
-
-      onStepFinishedEvent: (_params) => {
-        console.log("[Client] Step finished");
-      },
-
-      onRunFinishedEvent: (_params) => {
-        console.log("[Client] Run finished");
-        isProcessing = false;
-        sendButton.disabled = false;
-        input.focus();
-        unsubscribe.unsubscribe();
-      },
-    });
-
-    // Set the messages on the agent before running
     agent.messages = messages;
 
-    // Run the agent - HttpAgent will POST the messages to the server
-    await agent.runAgent();
+    await agent.runAgent({}, createSubscriber());
   } catch (error: any) {
     console.error("[Client] Error in sendMessage:", error);
     removeTypingIndicator();
@@ -234,6 +381,7 @@ async function sendMessage(): Promise<void> {
   }
 }
 
+
 function handleKeyPress(event: KeyboardEvent): void {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
@@ -241,7 +389,7 @@ function handleKeyPress(event: KeyboardEvent): void {
   }
 }
 
-// Initialize when DOM is ready
+
 document.addEventListener("DOMContentLoaded", () => {
   const messageInput = document.getElementById(
     "messageInput"

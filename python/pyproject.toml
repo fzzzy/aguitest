@@ -7,7 +7,6 @@ requires-python = ">=3.14"
 dependencies = [
     "ag-ui-protocol>=0.1.9",
     "fastapi>=0.115.0",
-    "mumulib @ file://${PROJECT_ROOT}/../../mumulib/python",
     "pydantic-ai-slim[ag-ui,bedrock,openai]>=1.1.0",
     "simpleeval>=1.0.3",
     "uvicorn>=0.38.0",

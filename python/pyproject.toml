@@ -7,6 +7,8 @@ requires-python = ">=3.14"
 dependencies = [
     "ag-ui-protocol>=0.1.9",
     "fastapi>=0.115.0",
+    "opentelemetry-api>=1.39.1",
+    "opentelemetry-sdk>=1.39.1",
     "pydantic-ai-slim[ag-ui,bedrock,openai]>=1.1.0",
     "simpleeval>=1.0.3",
     "uvicorn>=0.38.0",

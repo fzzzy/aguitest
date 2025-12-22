@@ -1,8 +1,9 @@
 """AG-UI Agent Server using standard AG-UI protocol with agent.to_ag_ui()"""
 
-import time
-import re
 import base64
+import os
+import re
+import time
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
@@ -11,6 +12,8 @@ from pydantic_ai import Agent, DeferredToolResults
 from pydantic_ai.ag_ui import run_ag_ui, StateDeps
 from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.messages import ToolCallPart
+from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
+from pydantic_ai.providers.bedrock import BedrockProvider
 from pydantic_ai import DeferredToolRequests
 from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent, UserMessage
 import uuid
@@ -18,6 +21,9 @@ from ag_ui.core import CustomEvent
 from simpleeval import simple_eval
 import json
 from dataclasses import dataclass
+
+
+DEBUG = False
 
 
 AGENT_INSTRUCTIONS = "You are a helpful assistant. Be concise and friendly."
@@ -71,8 +77,29 @@ toolset.add_function(
 )
 
 
+#model = BedrockConverseModel(
+#    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+#    provider=BedrockProvider(
+#        api_key=os.getenv("AWS_BEARER_TOKEN_BEDROCK"),
+#        region_name="us-east-1"
+#    ),
+#    settings=BedrockModelSettings(
+#        bedrock_additional_model_requests_fields={
+#            "anthropic_beta": ["context-1m-2025-08-07"]
+#        }
+#    )
+#)
+#
+#agent = Agent(
+#    model=model,
+#    instructions=AGENT_INSTRUCTIONS,
+#    toolsets=[toolset],
+#    output_type=[DeferredToolRequests, str],
+#    deps_type=StateDeps[Dependencies],
+#)
+
 agent = Agent(
-    "openai-responses:gpt-5.1",
+    "openai-responses:gpt-5.2",
     system_prompt=AGENT_INSTRUCTIONS,
     toolsets=[toolset],
     output_type=[DeferredToolRequests, str],
@@ -232,3 +259,49 @@ async def agent_run(run_input: RunAgentInput):
             yield chunk
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+
+
+from opentelemetry import trace
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExportResult
+
+from pydantic_ai import InstrumentationSettings
+
+
+import logging
+
+
+class CustomConsoleSpanExporter(ConsoleSpanExporter):
+    def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
+        for span in spans:
+            formatted_span = self.formatter(span)
+            span_dict = json.loads(formatted_span)
+            name = span_dict.get("name", "")
+            if DEBUG:
+                print(name, span_dict)
+        return SpanExportResult.SUCCESS
+
+
+def instrument(service_name="default"):
+    resource = Resource.create(attributes={SERVICE_NAME: service_name})
+
+    provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(provider)
+
+    print("Enabling local LLM prompt logging to console")
+    provider.add_span_processor(BatchSpanProcessor(CustomConsoleSpanExporter()))
+    # Override the OTEL_SDK_DISABLED but only if we are logging prompts locally
+    provider._disabled = False
+
+    Agent.instrument_all(InstrumentationSettings(version=3))
+
+#    logging.basicConfig(level=logging.DEBUG)
+#    logging.getLogger('boto3').setLevel(logging.DEBUG)
+#    logging.getLogger('botocore').setLevel(logging.DEBUG)
+
+
+instrument()

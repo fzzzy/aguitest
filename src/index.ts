@@ -86,6 +86,11 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
       isProcessing = false;
       sendButton.disabled = false;
       input.focus();
+      // Clear attachments from state after successful send
+      if (agent.state?.attachments) {
+        agent.state.attachments = {};
+      }
+      renderAttachmentChips();
       onFinished?.();
     },
   };
@@ -147,6 +152,58 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         customDiv.innerHTML = `<div class="custom-event-name">📜 ${params.event.name}</div><div class="custom-event-value">${typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2)}</div>`;
         const messagesDiv = document.getElementById("messages")!;
         messagesDiv.insertBefore(customDiv, messagesDiv.firstChild);
+        scrollToBottom();
+        return;
+      }
+
+      // Handle attachments event - render expanding sections with iframe previews
+      if (params.event.name === "attachments") {
+        const attachments = params.event.value as Record<string, string>;
+        if (!attachments || Object.keys(attachments).length === 0) {
+          return;
+        }
+
+        const messagesDiv = document.getElementById("messages")!;
+        const spacer = document.getElementById("scroll-anchor")!;
+
+        for (const [filename, dataUrl] of Object.entries(attachments)) {
+          const previewDiv = document.createElement("div");
+          previewDiv.className = "attachment-preview";
+
+          const header = document.createElement("div");
+          header.className = "attachment-preview-header";
+
+          const toggle = document.createElement("span");
+          toggle.className = "attachment-preview-toggle";
+          toggle.textContent = "▶";
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "attachment-preview-name";
+          nameSpan.textContent = `📎 ${filename}`;
+          nameSpan.title = filename;
+
+          header.appendChild(toggle);
+          header.appendChild(nameSpan);
+
+          const content = document.createElement("div");
+          content.className = "attachment-preview-content";
+
+          const iframe = document.createElement("iframe");
+          iframe.className = "attachment-preview-iframe";
+          iframe.src = dataUrl;
+          iframe.title = filename;
+
+          content.appendChild(iframe);
+          previewDiv.appendChild(header);
+          previewDiv.appendChild(content);
+
+          header.addEventListener("click", () => {
+            previewDiv.classList.toggle("expanded");
+          });
+
+          messagesDiv.insertBefore(previewDiv, spacer);
+        }
+
         scrollToBottom();
         return;
       }
@@ -390,13 +447,93 @@ function handleKeyPress(event: KeyboardEvent): void {
 }
 
 
+function renderAttachmentChips(): void {
+  const container = document.getElementById("attachmentsContainer")!;
+  container.innerHTML = "";
+
+  const attachments = agent.state?.attachments as Record<string, string> | undefined;
+  if (!attachments || Object.keys(attachments).length === 0) return;
+
+  for (const filename of Object.keys(attachments)) {
+    const chip = document.createElement("div");
+    chip.className = "attachment-chip";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "attachment-chip-name";
+    nameSpan.textContent = filename;
+    nameSpan.title = filename;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "attachment-chip-remove";
+    removeBtn.textContent = "×";
+    removeBtn.title = "Remove attachment";
+    removeBtn.addEventListener("click", () => removeAttachment(filename));
+
+    chip.appendChild(nameSpan);
+    chip.appendChild(removeBtn);
+    container.appendChild(chip);
+  }
+}
+
+
+function removeAttachment(filename: string): void {
+  const attachments = agent.state?.attachments as Record<string, string> | undefined;
+  if (attachments) {
+    delete attachments[filename];
+    console.log(`[Client] Removed attachment: ${filename}`);
+    renderAttachmentChips();
+  }
+}
+
+
+function handleFileSelect(event: Event): void {
+  const fileInput = event.target as HTMLInputElement;
+  const file = fileInput.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result as string;
+
+    if (!agent.state) {
+      agent.state = {};
+    }
+    if (!agent.state.attachments) {
+      agent.state.attachments = {} as Record<string, string>;
+    }
+
+    agent.state.attachments[file.name] = dataUrl;
+    console.log(`[Client] Attached file: ${file.name}`);
+    renderAttachmentChips();
+
+    // Reset file input so the same file can be selected again
+    fileInput.value = "";
+  };
+
+  reader.onerror = () => {
+    console.error("[Client] Error reading file:", reader.error);
+    showError("Failed to read file");
+  };
+
+  reader.readAsDataURL(file);
+}
+
+
 document.addEventListener("DOMContentLoaded", () => {
   const messageInput = document.getElementById(
     "messageInput"
   ) as HTMLInputElement;
   const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+  const attachButton = document.getElementById("attachButton") as HTMLButtonElement;
+  const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 
   messageInput.addEventListener("keypress", handleKeyPress);
   sendButton.addEventListener("click", sendMessage);
+
+  attachButton.addEventListener("click", () => {
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", handleFileSelect);
+
   messageInput.focus();
 });

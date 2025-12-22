@@ -115,6 +115,7 @@ body {
     padding: 20px;
     border-top: 1px solid #e0e0e0;
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
 }
 
@@ -130,6 +131,30 @@ body {
 
 .chat-input:focus {
     border-color: #7dd3c0;
+}
+
+.attach-button {
+    background: #e8f5f1;
+    color: #4a9b87;
+    border: 2px solid #7dd3c0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 24px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.attach-button:hover {
+    background: #7dd3c0;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(125, 211, 192, 0.4);
 }
 
 .send-button {
@@ -327,4 +352,120 @@ body {
 .approve-btn:disabled, .reject-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.attachments-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+.attachments-container:empty {
+    display: none;
+}
+
+.attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e8f5f1;
+    border: 1px solid #7dd3c0;
+    border-radius: 16px;
+    padding: 4px 8px 4px 12px;
+    font-size: 13px;
+    color: #2d6a5c;
+    animation: fadeIn 0.2s ease-in;
+}
+
+.attachment-chip-name {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-chip-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: #7dd3c0;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.attachment-chip-remove:hover {
+    background: #4a9b87;
+}
+
+.attachment-preview {
+    background: #e8f5f1;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin: 8px 0;
+    overflow: visible;
+    animation: fadeIn 0.3s ease-in;
+    flex-shrink: 0;
+    min-height: 44px;
+    width: 100%;
+}
+
+.attachment-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #e8f5f1;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+    min-height: 40px;
+}
+
+.attachment-preview-header:hover {
+    background: #d4ede5;
+}
+
+.attachment-preview-toggle {
+    font-size: 12px;
+    color: #4a9b87;
+    transition: transform 0.2s;
+}
+
+.attachment-preview.expanded .attachment-preview-toggle {
+    transform: rotate(90deg);
+}
+
+.attachment-preview-name {
+    flex: 1;
+    font-size: 13px;
+    height: 1.5em;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-preview-content {
+    display: none;
+    padding: 0;
+    background: white;
+}
+
+.attachment-preview.expanded .attachment-preview-content {
+    display: block;
+}
+
+.attachment-preview-iframe {
+    width: 100%;
+    height: 300px;
+    border: none;
+    display: block;
 }

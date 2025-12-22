@@ -15,12 +15,15 @@
             <div id="scroll-anchor">&nbsp;</div>
         </div>
         <div class="chat-input-container">
+            <div class="attachments-container" id="attachmentsContainer"></div>
             <input
                 type="text"
                 class="chat-input"
                 id="messageInput"
                 placeholder="Type your message..."
             >
+            <button class="attach-button" id="attachButton" title="Attach file">+</button>
+            <input type="file" id="fileInput" accept="text/*,image/*" style="display: none;">
             <button class="send-button" id="sendButton">Send</button>
         </div>
     </div>

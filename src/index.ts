@@ -1,6 +1,11 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
+import "../static/styles.css";
 
+new EventSource('http://localhost:8001/esbuild').addEventListener('change', () => {
+  console.log("reloading");
+  setTimeout(() => location.reload(), 100);
+});
 
 let messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
@@ -534,6 +539,13 @@ document.addEventListener("DOMContentLoaded", () => {
     fileInput.click();
   });
   fileInput.addEventListener("change", handleFileSelect);
+
+  // Add dynamic welcome node
+  const messagesDiv = document.getElementById("messages")!;
+  const welcomeDiv = document.createElement("div");
+  welcomeDiv.className = "system-message";
+  welcomeDiv.textContent = "Welcome! Hot reload test v2.";
+  messagesDiv.insertBefore(welcomeDiv, messagesDiv.firstChild);
 
   messageInput.focus();
 });

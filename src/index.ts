@@ -2,6 +2,51 @@
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
 import "../static/styles.css";
 
+// Web Speech API types
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onerror: ((this: SpeechRecognition, ev: Event & { error: string }) => void) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: new () => SpeechRecognition;
+    SpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
 new EventSource('http://localhost:8001/esbuild').addEventListener('change', () => {
   console.log("reloading");
   setTimeout(() => location.reload(), 100);
@@ -16,6 +61,102 @@ let toolCallsMap: Record<
 > = {};
 let isProcessing = false;
 
+// Speech recognition state
+let recognition: SpeechRecognition | null = null;
+let isRecognizing = false;
+
+function createRecognition(): SpeechRecognition {
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SpeechRecognitionAPI();
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.lang = "en-US";
+
+  rec.onstart = () => {
+    console.log("[Speech] Recognition started");
+    isRecognizing = true;
+    updateMicButtonUI(true);
+  };
+
+  rec.onend = () => {
+    console.log("[Speech] Recognition ended");
+    isRecognizing = false;
+    updateMicButtonUI(false);
+  };
+
+  rec.onerror = (event) => {
+    console.error("[Speech] Recognition error:", event.error);
+    isRecognizing = false;
+    updateMicButtonUI(false);
+  };
+
+  rec.onresult = (event: SpeechRecognitionEvent) => {
+    const input = document.getElementById("messageInput") as HTMLInputElement;
+    let finalTranscript = "";
+    let interimTranscript = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript;
+      } else {
+        interimTranscript += transcript;
+      }
+    }
+
+    if (finalTranscript) {
+      input.value = finalTranscript;
+      console.log("[Speech] Final transcript:", finalTranscript);
+    } else if (interimTranscript) {
+      input.value = interimTranscript;
+      console.log("[Speech] Interim transcript:", interimTranscript);
+    }
+  };
+
+  rec.onspeechend = () => {
+    console.log("[Speech] Speech ended");
+    rec.stop();
+  };
+
+  return rec;
+}
+
+function updateMicButtonUI(recording: boolean): void {
+  const micButton = document.getElementById("micButton");
+  const micIcon = micButton?.querySelector(".mic-icon") as SVGElement | null;
+  const stopIcon = micButton?.querySelector(".stop-icon") as SVGElement | null;
+
+  if (!micButton || !micIcon || !stopIcon) return;
+
+  if (recording) {
+    micButton.classList.add("recording");
+    micButton.title = "Stop speech recognition";
+    micIcon.style.display = "none";
+    stopIcon.style.display = "block";
+  } else {
+    micButton.classList.remove("recording");
+    micButton.title = "Start speech recognition";
+    micIcon.style.display = "block";
+    stopIcon.style.display = "none";
+  }
+}
+
+function startRecognition(): void {
+  if (isRecognizing) {
+    recognition?.stop();
+    return;
+  }
+
+  if (!recognition) {
+    recognition = createRecognition();
+  }
+
+  try {
+    recognition.start();
+  } catch (error) {
+    console.error("[Speech] Failed to start recognition:", error);
+  }
+}
 
 const agent = new HttpAgent({
   url: "/agent",
@@ -531,6 +672,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
   const attachButton = document.getElementById("attachButton") as HTMLButtonElement;
   const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+  const micButton = document.getElementById("micButton") as HTMLButtonElement;
 
   messageInput.addEventListener("keypress", handleKeyPress);
   sendButton.addEventListener("click", sendMessage);
@@ -539,6 +681,13 @@ document.addEventListener("DOMContentLoaded", () => {
     fileInput.click();
   });
   fileInput.addEventListener("change", handleFileSelect);
+
+  // Speech recognition button - only show if supported
+  if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+    micButton.addEventListener("click", startRecognition);
+  } else {
+    micButton.style.display = "none";
+  }
 
   // Add dynamic welcome node
   const messagesDiv = document.getElementById("messages")!;

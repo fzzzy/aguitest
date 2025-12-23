@@ -119,9 +119,16 @@ body {
     gap: 12px;
 }
 
-.chat-input {
+.input-wrapper {
     flex: 1;
-    padding: 12px 16px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.chat-input {
+    width: 100%;
+    padding: 12px 44px 12px 16px;
     border: 2px solid #e0e0e0;
     border-radius: 24px;
     font-size: 14px;
@@ -131,6 +138,50 @@ body {
 
 .chat-input:focus {
     border-color: #7dd3c0;
+}
+
+.mic-button {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+    color: #666;
+}
+
+.mic-button:hover {
+    background: #f0f0f0;
+    color: #4a9b87;
+}
+
+.mic-button.recording {
+    background: #ffebee;
+    color: #d32f2f;
+    animation: pulse 1.5s infinite;
+}
+
+.mic-button.recording:hover {
+    background: #ffcdd2;
+}
+
+.mic-button svg {
+    fill: currentColor;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
 }
 
 .attach-button {

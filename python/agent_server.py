@@ -281,8 +281,7 @@ class CustomConsoleSpanExporter(ConsoleSpanExporter):
             formatted_span = self.formatter(span)
             span_dict = json.loads(formatted_span)
             name = span_dict.get("name", "")
-            if DEBUG:
-                print(name, span_dict)
+            print(name, span_dict)
         return SpanExportResult.SUCCESS
 
 
@@ -304,4 +303,5 @@ def instrument(service_name="default"):
 #    logging.getLogger('botocore').setLevel(logging.DEBUG)
 
 
-instrument()
+if DEBUG:
+    instrument()

@@ -127,6 +127,71 @@ async def root():
     return HTMLResponse(html)
 
 
+def process_text_attachment(base64_data: str, filename: str) -> TextInputContent:
+    text_content = base64.b64decode(base64_data).decode("utf-8")
+    return TextInputContent(
+        text=f"""<file-attachment name="{filename}">
+{text_content}
+</file-attachment>"""
+    )
+
+
+def process_binary_attachment(
+    media_type: str, base64_data: str, filename: str
+) -> BinaryInputContent:
+    return BinaryInputContent(
+        mimeType=media_type,
+        data=base64_data,
+        filename=filename
+    )
+
+
+def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
+    attachments = run_input.state.get("attachments", {})
+    attachments_info = {}
+    if not (attachments and run_input.messages):
+        return
+    # Find the last user message index
+    last_user_idx = -1
+    for i in range(len(run_input.messages) - 1, -1, -1):
+        if run_input.messages[i].role == "user":
+            last_user_idx = i
+            break
+
+    if not (last_user_idx >= 0):
+        return [], []
+
+    msg = run_input.messages[last_user_idx]
+    content_list = None
+    text_attachment_messages = []
+
+    for filename, data_url in attachments.items():
+        parsed = parse_data_url(data_url)
+        if not parsed:
+            continue
+        media_type, base64_data = parsed
+        attachments_info[filename] = data_url
+
+        if content_list is None:
+            if isinstance(msg.content, str):
+                content_list = [TextInputContent(text=msg.content)]
+            else:
+                content_list = list(msg.content)
+
+        if media_type.startswith("text/"):
+            message = process_text_attachment(base64_data, filename)
+            content_list.append(message)
+        else:
+            content_list.append(
+                process_binary_attachment(media_type, base64_data, filename)
+            )
+
+    if content_list:
+        msg.content = content_list
+
+    return attachments_info
+
+
 @app.post("/agent")
 async def agent_run(run_input: RunAgentInput):
     deferred_tool_requests = {}
@@ -148,7 +213,7 @@ async def agent_run(run_input: RunAgentInput):
 
     async def event_stream():
         deferred_tool_results = None
-        attachments_info = {}
+        attachments_info: dict[str, str] = {}
 
         if run_input.state:
             # Only create DeferredToolResults if there are actual approvals
@@ -156,60 +221,7 @@ async def agent_run(run_input: RunAgentInput):
             if approvals:
                 deferred_tool_results = DeferredToolResults(approvals=approvals)
 
-            # Process attachments from state
-            attachments = run_input.state.get("attachments", {})
-            if attachments and run_input.messages:
-                # Find the last user message index
-                last_user_idx = -1
-                for i in range(len(run_input.messages) - 1, -1, -1):
-                    if run_input.messages[i].role == "user":
-                        last_user_idx = i
-                        break
-
-                if last_user_idx >= 0:
-                    msg = run_input.messages[last_user_idx]
-                    # Convert message content to list if it's a string (for binary attachments)
-                    content_list = None
-                    text_attachment_messages = []
-
-                    for filename, data_url in attachments.items():
-                        parsed = parse_data_url(data_url)
-                        if parsed:
-                            media_type, base64_data = parsed
-                            attachments_info[filename] = data_url
-
-                            if media_type.startswith("text/"):
-                                # Decode text content and create a separate user message
-                                text_content = base64.b64decode(base64_data).decode("utf-8")
-                                text_attachment_messages.append(
-                                    UserMessage(
-                                        id=str(uuid.uuid4()),
-                                        role="user",
-                                        content=f"<file-attachment name=\"{filename}\">{text_content}</file-attachment>"
-                                    )
-                                )
-                            else:
-                                # Use BinaryInputContent for non-text (images, etc.)
-                                if content_list is None:
-                                    if isinstance(msg.content, str):
-                                        content_list = [TextInputContent(text=msg.content)]
-                                    else:
-                                        content_list = list(msg.content)
-                                content_list.append(
-                                    BinaryInputContent(
-                                        mimeType=media_type,
-                                        data=base64_data,
-                                        filename=filename
-                                    )
-                                )
-
-                    # Update message content if we added binary attachments
-                    if content_list is not None:
-                        msg.content = content_list
-
-                    # Insert text attachment messages after the user message
-                    for idx, text_msg in enumerate(text_attachment_messages):
-                        run_input.messages.insert(last_user_idx + 1 + idx, text_msg)
+            attachments_info = process_attachments(run_input)
 
         ag_ui_events = run_ag_ui(
             agent,

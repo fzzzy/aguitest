@@ -58,16 +58,6 @@ let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
 
 // Web Components
-function defineComponent(name: string) {
-  customElements.define(name, class extends HTMLElement {
-    connectedCallback() {
-      const template = document.getElementById(`template-${name}`) as HTMLTemplateElement;
-      const shadow = this.attachShadow({ mode: "open" });
-      shadow.appendChild(template.content.cloneNode(true));
-    }
-  });
-}
-
 class ChatMessage extends HTMLElement {
   connectedCallback() {
     const template = document.getElementById("template-chat-message") as HTMLTemplateElement;
@@ -126,8 +116,6 @@ class AttachmentPreview extends HTMLElement {
   }
 }
 customElements.define("attachment-preview", AttachmentPreview);
-
-defineComponent("error-message");
 
 class ToolCall extends HTMLElement {
   private argsEl: Element | null = null;

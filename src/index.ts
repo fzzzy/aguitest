@@ -58,16 +58,6 @@ let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
 
 // Web Components
-class ChatMessage extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-chat-message") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-    const avatar = shadow.querySelector(".avatar")!;
-    avatar.textContent = this.getAttribute("role") === "user" ? "U" : "A";
-  }
-}
-customElements.define("chat-message", ChatMessage);
 
 class CustomEventDisplay extends HTMLElement {
   connectedCallback() {

@@ -300,56 +300,6 @@
             <div class="value"><slot></slot></div>
         </div>
     </template>
-    <template id="template-chat-message">
-        <style>
-            :host {
-                display: flex;
-                gap: 12px;
-                animation: fadeIn 0.3s ease-in;
-            }
-            :host([role="user"]) {
-                flex-direction: row-reverse;
-            }
-            .avatar {
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: 600;
-                flex-shrink: 0;
-            }
-            :host([role="user"]) .avatar {
-                background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
-                color: white;
-            }
-            :host([role="assistant"]) .avatar {
-                background: #e8f5f1;
-                color: #4a9b87;
-            }
-            .content {
-                padding: 12px 16px;
-                border-radius: 12px;
-                max-width: 70%;
-                word-wrap: break-word;
-            }
-            :host([role="user"]) .content {
-                background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
-                color: white;
-            }
-            :host([role="assistant"]) .content {
-                background: #e8f5f1;
-                color: #2d6a5c;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-        </style>
-        <div class="avatar"></div>
-        <div class="content"><slot></slot></div>
-    </template>
     <script type="module" src="/index.ts"></script>
 </body>
 </html>

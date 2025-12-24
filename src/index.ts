@@ -127,7 +127,6 @@ class AttachmentPreview extends HTMLElement {
 }
 customElements.define("attachment-preview", AttachmentPreview);
 
-defineComponent("tool-approval");
 defineComponent("error-message");
 
 class ToolCall extends HTMLElement {

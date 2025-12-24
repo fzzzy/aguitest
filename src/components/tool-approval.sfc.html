@@ -1,0 +1,30 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      animation: fadeIn 0.3s ease-in;
+    }
+    .wrapper {
+      background: #fff8e1;
+      border-left: 4px solid #ffa726;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-size: 14px;
+    }
+    .header {
+      color: #e65100;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <div class="wrapper">
+    <div class="header">Tool Approval Required</div>
+    <slot></slot>
+  </div>
+</template>

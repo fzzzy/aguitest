@@ -68,7 +68,6 @@ function defineComponent(name: string) {
   });
 }
 
-defineComponent("chat-input-container");
 defineComponent("attachments-container");
 defineComponent("input-wrapper");
 defineComponent("mic-button");

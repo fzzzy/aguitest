@@ -5,8 +5,9 @@
   "description": "AG-UI test application with TypeScript frontend",
   "private": true,
   "scripts": {
-    "build": "node esbuild.js",
-    "watch": "node esbuild.js --serve"
+    "dev": "vite",
+    "build": "tsc -p src/tsconfig.json && vite build",
+    "preview": "vite preview"
   },
   "author": "Donovan Preston",
   "license": "MIT",
@@ -15,12 +16,11 @@
     "@types/node": "^22.8.6",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
-    "chokidar": "^3.5.3",
-    "esbuild": "^0.19.12",
     "eslint": "^9.38.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^7.1.7"
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.40",

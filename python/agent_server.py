@@ -5,8 +5,6 @@ import os
 import re
 import time
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 from starlette.responses import StreamingResponse
 from pydantic_ai import Agent, DeferredToolResults
 from pydantic_ai.ag_ui import run_ag_ui, StateDeps
@@ -108,23 +106,6 @@ agent = Agent(
 
 
 app = FastAPI()
-
-
-app.mount("/static", StaticFiles(directory="../static"), name="static")
-app.mount("/dist", StaticFiles(directory="../dist"), name="dist")
-
-
-@app.get("/")
-async def root():
-    with open("../static/index.html", "r") as f:
-        html = f.read()
-    with open("../static/styles.css", "r") as f:
-        css = f.read()
-    html = html.replace(
-        '<link rel="stylesheet" href="/static/styles.css">',
-        f"<style>\n{css}</style>"
-    )
-    return HTMLResponse(html)
 
 
 def process_text_attachment(base64_data: str, filename: str) -> TextInputContent:

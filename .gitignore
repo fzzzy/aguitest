@@ -7,7 +7,7 @@ wheels/
 
 # TypeScript/JavaScript build output
 dist/
-src/node_modules/
+node_modules/
 *.tsbuildinfo
 
 # Tool caches

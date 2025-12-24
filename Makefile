@@ -3,21 +3,21 @@
 # Set UV to use aguitest-venv instead of .venv
 export UV_PROJECT_ENVIRONMENT = aguitest-venv
 
-# Development mode - runs server with auto-reload AND TypeScript watch mode
-all: python/aguitest-venv src/node_modules
-	@echo "Starting TypeScript watch mode and Python server..."
-	@(cd src && npm run watch &) && \
-	(sleep 2 && open http://127.0.0.1:8999/) & \
+# Development mode - runs Vite dev server AND Python server
+all: python/aguitest-venv node_modules
+	@echo "Starting Vite dev server and Python server..."
+	@(npm run dev &) && \
+	(sleep 2 && open http://localhost:5173/) & \
 	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8999 --reload
 
 # Build TypeScript frontend
-dist: src/node_modules src/index.ts
-	cd src && npm run build
+dist: node_modules src/index.ts
+	npm run build
 
 # Install npm dependencies
-src/node_modules: src/package.json
-	cd src && npm install
-	@touch src/node_modules
+node_modules: package.json
+	npm install
+	@touch node_modules
 
 # Create the virtual environment from pyproject.toml
 python/aguitest-venv: python/pyproject.toml
@@ -29,43 +29,42 @@ typecheck: python/aguitest-venv
 	cd python && uv run mypy *.py
 
 # Run ruff linter
-lint: python/aguitest-venv src/node_modules
+lint: python/aguitest-venv node_modules
 	cd python && uv run ruff check *.py
-	cd src && npx eslint *.ts
+	npx eslint src/*.ts
 
 # Run ruff formatter
-format: python/aguitest-venv src/node_modules
+format: python/aguitest-venv node_modules
 	cd python && uv run ruff format *.py
-	cd src && npx prettier --write *.ts
+	npx prettier --write src/*.ts
 
 # Run all checks (typecheck + lint)
 check: typecheck lint
 
 # Run checks and auto-fix issues (lint with --fix, then format)
-fix: python/aguitest-venv src/node_modules
+fix: python/aguitest-venv node_modules
 	cd python && uv run mypy *.py
 	cd python && uv run ruff check --fix *.py
-	cd src && npx eslint --fix *.ts
+	npx eslint --fix src/*.ts
 	cd python && uv run ruff format *.py
-	cd src && npx prettier --write *.ts
+	npx prettier --write src/*.ts
 
 # Clean up build artifacts
 clean:
 	rm -rf python/aguitest-venv
 	rm -rf python/uv.lock
 	rm -rf python/__pycache__ python/.mypy_cache python/.ruff_cache
-	rm -rf src/node_modules dist
+	rm -rf node_modules dist
 
 # Display help information
 help:
 	@echo "Available targets:"
-	@echo "  all              - Run agent_server.py with auto-reload (default)"
-	@echo "  dev              - Run server + TypeScript watch mode for development"
+	@echo "  all              - Run Vite dev server + Python server (default)"
+	@echo "  dist             - Build TypeScript frontend for production"
 	@echo "  check            - Run typecheck and lint"
 	@echo "  fix              - Run check then format (recommended before commit)"
-	@echo "  typecheck        - Run mypy type checking on all Python files"
-	@echo "  lint             - Run ruff linter on all Python files"
-	@echo "  format           - Run ruff formatter on all Python files"
-	@echo "  aguitest-venv    - Create/update virtual environment"
-	@echo "  clean            - Remove virtual environment and lock file"
+	@echo "  typecheck        - Run mypy type checking on Python files"
+	@echo "  lint             - Run linter on Python and TypeScript files"
+	@echo "  format           - Run formatter on Python and TypeScript files"
+	@echo "  clean            - Remove build artifacts and dependencies"
 	@echo "  help             - Display this help message"

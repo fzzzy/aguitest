@@ -1,6 +1,6 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
-import "../static/styles.css";
+import "./styles.css";
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -46,11 +46,6 @@ declare global {
     SpeechRecognition: new () => SpeechRecognition;
   }
 }
-
-new EventSource('http://localhost:8001/esbuild').addEventListener('change', () => {
-  console.log("reloading");
-  setTimeout(() => location.reload(), 100);
-});
 
 let messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;

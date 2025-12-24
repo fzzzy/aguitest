@@ -1,15 +1,14 @@
 {
   "compilerOptions": {
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "outDir": "../dist/types",
+    "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "module": "ES2022",
     "target": "ES2022",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM"]
+    "lib": ["ES2022", "DOM"],
+    "types": ["vite/client"]
   },
   "include": ["./**/*"],
   "exclude": ["node_modules", "../dist"]

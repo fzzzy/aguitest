@@ -7,76 +7,33 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		E3970A652EF9213100B05825 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-		E3970A662EF9213100B05825 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
-		E3970A672EF9213100B05825 /* simpleeval.pyi */ = {isa = PBXFileReference; lastKnownFileType = text; path = simpleeval.pyi; sourceTree = "<group>"; };
-		E3970A692EF9213100B05825 /* .python-version */ = {isa = PBXFileReference; lastKnownFileType = text; path = ".python-version"; sourceTree = "<group>"; };
-		E3970A6A2EF9213100B05825 /* agent_server.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = agent_server.py; sourceTree = "<group>"; };
-		E3970A6B2EF9213100B05825 /* pyproject.toml */ = {isa = PBXFileReference; lastKnownFileType = text; path = pyproject.toml; sourceTree = "<group>"; };
-		E3970A6D2EF9213100B05825 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		E3970A6E2EF9213100B05825 /* .prettierrc */ = {isa = PBXFileReference; lastKnownFileType = text; path = .prettierrc; sourceTree = "<group>"; };
-		E3970A6F2EF9213100B05825 /* esbuild.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = esbuild.js; sourceTree = "<group>"; };
-		E3970A702EF9213100B05825 /* eslint.config.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = eslint.config.js; sourceTree = "<group>"; };
-		E3970A712EF9213100B05825 /* index.ts */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.typescript; path = index.ts; sourceTree = "<group>"; };
-		E3970A722EF9213100B05825 /* package.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = package.json; sourceTree = "<group>"; };
-		E3970A732EF9213100B05825 /* package-lock.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "package-lock.json"; sourceTree = "<group>"; };
-		E3970A742EF9213100B05825 /* tsconfig.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = tsconfig.json; sourceTree = "<group>"; };
-		E3970A762EF9213100B05825 /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = index.html; sourceTree = "<group>"; };
-		E3970A772EF9213100B05825 /* styles.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = styles.css; sourceTree = "<group>"; };
+		E3411F242EFC1EFF002FD0E7 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		E3411F252EFC1EFF002FD0E7 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		E341412B2EFC1EFF002FD0E7 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXGroup section */
-		E3970A682EF9213100B05825 /* stubs */ = {
-			isa = PBXGroup;
-			children = (
-				E3970A672EF9213100B05825 /* simpleeval.pyi */,
-			);
-			path = stubs;
-			sourceTree = "<group>";
-		};
-		E3970A6C2EF9213100B05825 /* python */ = {
-			isa = PBXGroup;
-			children = (
-				E3970A682EF9213100B05825 /* stubs */,
-				E3970A692EF9213100B05825 /* .python-version */,
-				E3970A6A2EF9213100B05825 /* agent_server.py */,
-				E3970A6B2EF9213100B05825 /* pyproject.toml */,
-			);
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		E341412A2EFC1EFF002FD0E7 /* python */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
 			path = python;
 			sourceTree = "<group>";
 		};
-		E3970A752EF9213100B05825 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				E3970A6E2EF9213100B05825 /* .prettierrc */,
-				E3970A6F2EF9213100B05825 /* esbuild.js */,
-				E3970A702EF9213100B05825 /* eslint.config.js */,
-				E3970A712EF9213100B05825 /* index.ts */,
-				E3970A722EF9213100B05825 /* package.json */,
-				E3970A732EF9213100B05825 /* package-lock.json */,
-				E3970A742EF9213100B05825 /* tsconfig.json */,
-			);
+		E3415D512EFC1EFF002FD0E7 /* src */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
 			path = src;
 			sourceTree = "<group>";
 		};
-		E3970A782EF9213100B05825 /* static */ = {
-			isa = PBXGroup;
-			children = (
-				E3970A762EF9213100B05825 /* index.html */,
-				E3970A772EF9213100B05825 /* styles.css */,
-			);
-			path = static;
-			sourceTree = "<group>";
-		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXGroup section */
 		E39790C32EF91F0A00B05825 = {
 			isa = PBXGroup;
 			children = (
-				E3970A652EF9213100B05825 /* LICENSE */,
-				E3970A662EF9213100B05825 /* Makefile */,
-				E3970A6C2EF9213100B05825 /* python */,
-				E3970A6D2EF9213100B05825 /* README.md */,
-				E3970A752EF9213100B05825 /* src */,
-				E3970A782EF9213100B05825 /* static */,
+				E3411F242EFC1EFF002FD0E7 /* LICENSE */,
+				E3411F252EFC1EFF002FD0E7 /* Makefile */,
+				E341412A2EFC1EFF002FD0E7 /* python */,
+				E341412B2EFC1EFF002FD0E7 /* README.md */,
+				E3415D512EFC1EFF002FD0E7 /* src */,
 			);
 			sourceTree = "<group>";
 		};

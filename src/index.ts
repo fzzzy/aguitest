@@ -59,17 +59,6 @@ let isProcessing = false;
 
 // Web Components
 
-class CustomEventDisplay extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-custom-event") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-    const nameEl = shadow.querySelector(".name")!;
-    nameEl.textContent = this.getAttribute("name") || "";
-  }
-}
-customElements.define("custom-event-display", CustomEventDisplay);
-
 class AttachmentChip extends HTMLElement {
   connectedCallback() {
     const template = document.getElementById("template-attachment-chip") as HTMLTemplateElement;

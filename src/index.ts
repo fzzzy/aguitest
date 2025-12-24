@@ -59,26 +59,6 @@ let isProcessing = false;
 
 // Web Components
 
-class AttachmentPreview extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-attachment-preview") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-    const filename = this.getAttribute("filename") || "";
-    const nameEl = shadow.querySelector(".name") as HTMLElement;
-    nameEl.textContent = `📎 ${filename}`;
-    nameEl.title = filename;
-    const iframe = shadow.querySelector("iframe")!;
-    iframe.src = this.getAttribute("src") || "";
-    iframe.title = filename;
-    const header = shadow.querySelector(".header")!;
-    header.addEventListener("click", () => {
-      this.classList.toggle("expanded");
-    });
-  }
-}
-customElements.define("attachment-preview", AttachmentPreview);
-
 class ToolCall extends HTMLElement {
   private argsEl: Element | null = null;
 

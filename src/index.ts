@@ -57,27 +57,10 @@ let currentToolCall: ToolCall | null = null;
 let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
 
-// Web Components
-
-class ToolCall extends HTMLElement {
-  private argsEl: Element | null = null;
-
-  connectedCallback() {
-    const template = document.getElementById("template-tool-call") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-    const toolName = this.getAttribute("name") || "";
-    shadow.querySelector(".name")!.textContent = `🔧 Calling tool: ${toolName}`;
-    this.argsEl = shadow.querySelector(".args")!;
-  }
-
-  appendArgs(delta: string) {
-    if (this.argsEl) {
-      this.argsEl.textContent += delta;
-    }
-  }
+// Web Component interfaces for type annotations
+interface ToolCall extends HTMLElement {
+  appendArgs(delta: string): void;
 }
-customElements.define("tool-call", ToolCall);
 
 
 class ToolApprovalItem extends HTMLElement {

@@ -81,6 +81,17 @@ defineComponent("input-wrapper");
 defineComponent("mic-button");
 defineComponent("typing-indicator");
 
+class ChatMessage extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-chat-message") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+    const avatar = shadow.querySelector(".avatar")!;
+    avatar.textContent = this.getAttribute("role") === "user" ? "U" : "A";
+  }
+}
+customElements.define("chat-message", ChatMessage);
+
 class ScrollAnchor extends HTMLElement {
   connectedCallback() {
     if (document.querySelectorAll("scroll-anchor").length > 1) {
@@ -496,23 +507,12 @@ function scrollToBottom(): void {
 function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
   const spacer = document.getElementById("scroll-anchor")!;
-  const messageDiv = document.createElement("div");
-  messageDiv.className = `message ${role}`;
-
-  const avatar = document.createElement("div");
-  avatar.className = "message-avatar";
-  avatar.textContent = role === "user" ? "U" : "A";
-
-  const contentDiv = document.createElement("div");
-  contentDiv.className = "message-content";
-  contentDiv.textContent = content;
-
-  messageDiv.appendChild(avatar);
-  messageDiv.appendChild(contentDiv);
-  messagesDiv.insertBefore(messageDiv, spacer);
+  const messageEl = document.createElement("chat-message");
+  messageEl.setAttribute("role", role);
+  messageEl.textContent = content;
+  messagesDiv.insertBefore(messageEl, spacer);
   scrollToBottom();
-
-  return contentDiv;
+  return messageEl;
 }
 
 

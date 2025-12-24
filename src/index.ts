@@ -137,16 +137,6 @@ class ToolCall extends HTMLElement {
 }
 customElements.define("tool-call", ToolCall);
 
-class ToolResult extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-tool-result") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-    const content = this.getAttribute("content") || "";
-    shadow.querySelector(".content")!.textContent = content;
-  }
-}
-customElements.define("tool-result", ToolResult);
 
 class ToolApprovalItem extends HTMLElement {
   connectedCallback() {

@@ -61,6 +61,25 @@ let toolCallsMap: Record<
 > = {};
 let isProcessing = false;
 
+// Web Components
+class WelcomeMessage extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-welcome-message") as HTMLElement;
+    const node = template.cloneNode(true) as HTMLElement;
+    node.removeAttribute("id");
+    node.style.display = "";
+    node.textContent = this.textContent;
+    this.replaceWith(node);
+  }
+}
+customElements.define("welcome-message", WelcomeMessage);
+
+function welcome_message(text: string): HTMLElement {
+  const el = document.createElement("welcome-message");
+  el.textContent = text;
+  return el;
+}
+
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;
 let isRecognizing = false;
@@ -691,10 +710,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Add dynamic welcome node
   const messagesDiv = document.getElementById("messages")!;
-  const welcomeDiv = document.createElement("div");
-  welcomeDiv.className = "system-message";
-  welcomeDiv.textContent = "Welcome!";
-  messagesDiv.insertBefore(welcomeDiv, messagesDiv.firstChild);
+  messagesDiv.insertBefore(welcome_message("Welcome!"), messagesDiv.firstChild);
 
   messageInput.focus();
 });

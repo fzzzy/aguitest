@@ -297,14 +297,6 @@ body {
     color: #2e7d32;
 }
 
-.system-message {
-    color: #666;
-    font-style: italic;
-    padding: 8px;
-    text-align: center;
-    font-size: 12px;
-}
-
 .custom-event {
     background: #e3f2fd;
     border-left: 4px solid #2196f3;

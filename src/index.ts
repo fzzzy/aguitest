@@ -140,6 +140,40 @@ class AttachmentPreview extends HTMLElement {
 }
 customElements.define("attachment-preview", AttachmentPreview);
 
+defineComponent("tool-approval");
+
+class ToolApprovalItem extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-tool-approval-item") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+
+    const toolName = this.getAttribute("tool-name") || "";
+    const args = this.getAttribute("args") || "";
+
+    shadow.querySelector(".tool-name")!.textContent = `Tool: ${toolName}`;
+    shadow.querySelector(".args")!.textContent = `Arguments: ${args}`;
+
+    const approveBtn = shadow.querySelector(".approve")!;
+    const rejectBtn = shadow.querySelector(".reject")!;
+
+    approveBtn.addEventListener("click", () => {
+      approveBtn.setAttribute("disabled", "true");
+      rejectBtn.setAttribute("disabled", "true");
+      this.classList.add("approved");
+      this.dispatchEvent(new CustomEvent("approve"));
+    });
+
+    rejectBtn.addEventListener("click", () => {
+      approveBtn.setAttribute("disabled", "true");
+      rejectBtn.setAttribute("disabled", "true");
+      this.classList.add("rejected");
+      this.dispatchEvent(new CustomEvent("reject"));
+    });
+  }
+}
+customElements.define("tool-approval-item", ToolApprovalItem);
+
 class ScrollAnchor extends HTMLElement {
   connectedCallback() {
     if (document.querySelectorAll("scroll-anchor").length > 1) {
@@ -412,60 +446,40 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
 
         removeTypingIndicator();
 
-        const approvalDiv = document.createElement("div");
-        approvalDiv.className = "custom-event deferred-approval";
-
-        let approvalHTML = '<div class="custom-event-name">🔐 Tool Approval Required</div>';
-
-        for (const [callId, callInfo] of Object.entries(params.event.value as Record<string, any>)) {
-          const args = typeof callInfo.args === 'string' ? callInfo.args : JSON.stringify(callInfo.args);
-          approvalHTML += `
-            <div class="approval-item" data-call-id="${callId}">
-              <div class="approval-tool-name">Tool: ${callInfo.tool_name}</div>
-              <div class="approval-args">Arguments: ${args}</div>
-              <div class="approval-buttons">
-                <button class="approve-btn" data-call-id="${callId}">✓ Approve</button>
-                <button class="reject-btn" data-call-id="${callId}">✗ Reject</button>
-              </div>
-            </div>
-          `;
-        }
-
-        approvalDiv.innerHTML = approvalHTML;
-        const messagesDiv = document.getElementById("messages")!;
-        const spacer = document.getElementById("scroll-anchor")!;
-        messagesDiv.insertBefore(approvalDiv, spacer);
-        scrollToBottom();
-
+        const approvalContainer = document.createElement("tool-approval");
         const approvals: Record<string, boolean> = {};
         const totalTools = Object.keys(params.event.value as Record<string, any>).length;
         let approvedCount = 0;
 
-        const handleApproval = async (callId: string, approved: boolean) => {
-          approvals[callId] = approved;
-          approvedCount++;
+        for (const [callId, callInfo] of Object.entries(params.event.value as Record<string, any>)) {
+          const args = typeof callInfo.args === 'string' ? callInfo.args : JSON.stringify(callInfo.args);
+          const item = document.createElement("tool-approval-item");
+          item.setAttribute("tool-name", callInfo.tool_name);
+          item.setAttribute("args", args);
 
-          const item = approvalDiv.querySelector(`[data-call-id="${callId}"]`) as HTMLElement;
-          item.querySelector('.approve-btn')!.setAttribute('disabled', 'true');
-          item.querySelector('.reject-btn')!.setAttribute('disabled', 'true');
-          item.classList.add(approved ? 'approved' : 'rejected');
-
-          if (approvedCount === totalTools) {
-            await continueWithApprovals(approvals);
-          }
-        };
-
-        approvalDiv.querySelectorAll('.approve-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            handleApproval((e.target as HTMLElement).dataset.callId!, true);
+          item.addEventListener("approve", async () => {
+            approvals[callId] = true;
+            approvedCount++;
+            if (approvedCount === totalTools) {
+              await continueWithApprovals(approvals);
+            }
           });
-        });
 
-        approvalDiv.querySelectorAll('.reject-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            handleApproval((e.target as HTMLElement).dataset.callId!, false);
+          item.addEventListener("reject", async () => {
+            approvals[callId] = false;
+            approvedCount++;
+            if (approvedCount === totalTools) {
+              await continueWithApprovals(approvals);
+            }
           });
-        });
+
+          approvalContainer.appendChild(item);
+        }
+
+        const messagesDiv = document.getElementById("messages")!;
+        const spacer = document.getElementById("scroll-anchor")!;
+        messagesDiv.insertBefore(approvalContainer, spacer);
+        scrollToBottom();
 
         return;
       }

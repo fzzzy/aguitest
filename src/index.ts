@@ -1,7 +1,7 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
-import "./styles.css";
 import { registerComponents } from "./sfc";
+import type { ToolCall, SendButton, MessageInput } from "./components/elements";
 
 // Register SFC components
 registerComponents('./components/*.sfc.html');
@@ -56,21 +56,6 @@ let currentAssistantMessage: HTMLElement | null = null;
 let currentToolCall: ToolCall | null = null;
 let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
-
-// Web Component interfaces for type annotations
-interface ToolCall extends HTMLElement {
-  appendArgs(delta: string): void;
-}
-
-interface SendButton extends HTMLElement {
-  disabled: boolean;
-}
-
-interface MessageInput extends HTMLElement {
-  value: string;
-  focus(): void;
-}
-
 
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;

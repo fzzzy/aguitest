@@ -1,17 +1,11 @@
 <template>
   <style>
     :host {
-      flex: 1;
-      display: flex;
-    }
-    div {
-      flex: 1;
+      display: block;
       overflow-y: auto;
-      padding: 1.5em;
-      display: flex;
       flex-direction: column;
       gap: 16px;
     }
   </style>
-  <div><slot></slot></div>
+  <slot></slot>
 </template>

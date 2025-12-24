@@ -1,12 +1,10 @@
 <template>
   <style>
-    div {
-      padding: 20px;
+    :host {
+      display: block;
       border-top: 1px solid #e0e0e0;
-      display: flex;
-      flex-wrap: wrap;
       gap: 12px;
     }
   </style>
-  <div><slot></slot></div>
+  <slot></slot>
 </template>

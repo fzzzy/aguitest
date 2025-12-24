@@ -6,14 +6,14 @@
     <title>AG-UI Chat</title>
 </head>
 <body>
-    <chat-container>
-        <chat-header>AG-UI Chat</chat-header>
-        <chat-messages id="messages">
+    <chat-container style="display: flex; flex-direction: column; width: 100%; max-width: 800px; min-height: 90vh">
+        <chat-header style="padding: 20px">AG-UI Chat</chat-header>
+        <chat-messages id="messages" style="display: flex; flex: 1; padding: 1.5em">
             <scroll-anchor id="scroll-anchor"></scroll-anchor>
         </chat-messages>
-        <chat-input-container>
-            <attachments-container id="attachments-container"></attachments-container>
-            <message-input id="messageInput"></message-input>
+        <chat-input-container style="display: flex; flex-wrap: wrap; padding: 20px">
+            <attachments-container id="attachments-container" style="width: 100%"></attachments-container>
+            <message-input id="messageInput" style="flex: 1"></message-input>
             <mic-button
                 id="micButton"
                 title="Start speech recognition"></mic-button>

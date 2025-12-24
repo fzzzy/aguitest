@@ -1,10 +1,10 @@
 <template>
   <style>
-    div {
+    :host {
+      display: block;
       box-sizing: border-box;
       background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
       color: white;
-      padding: 20px;
       border-radius: 12px 12px 0 0;
       text-align: center;
     }
@@ -14,5 +14,5 @@
       margin: 0;
     }
   </style>
-  <div><h1><slot></slot></h1></div>
+  <h1><slot></slot></h1>
 </template>

@@ -138,6 +138,7 @@ class AttachmentPreview extends HTMLElement {
 customElements.define("attachment-preview", AttachmentPreview);
 
 defineComponent("tool-approval");
+defineComponent("error-message");
 
 class ToolCall extends HTMLElement {
   private argsEl: Element | null = null;
@@ -595,10 +596,9 @@ function removeTypingIndicator(): void {
 function showError(message: string): void {
   const messagesDiv = document.getElementById("messages")!;
   const spacer = document.getElementById("scroll-anchor")!;
-  const errorDiv = document.createElement("div");
-  errorDiv.className = "error-message";
-  errorDiv.textContent = "Error: " + message;
-  messagesDiv.insertBefore(errorDiv, spacer);
+  const errorEl = document.createElement("error-message");
+  errorEl.textContent = "Error: " + message;
+  messagesDiv.insertBefore(errorEl, spacer);
   scrollToBottom();
 }
 
@@ -730,4 +730,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   messageInput.focus();
+
+  // Expose test function to console for debugging
+  (window as any).testError = () => showError("This is a test error message");
 });

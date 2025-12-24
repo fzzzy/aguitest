@@ -63,39 +63,6 @@ interface ToolCall extends HTMLElement {
 }
 
 
-class ToolApprovalItem extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-tool-approval-item") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-
-    const toolName = this.getAttribute("tool-name") || "";
-    const args = this.getAttribute("args") || "";
-
-    shadow.querySelector(".tool-name")!.textContent = `Tool: ${toolName}`;
-    shadow.querySelector(".args")!.textContent = `Arguments: ${args}`;
-
-    const approveBtn = shadow.querySelector(".approve")!;
-    const rejectBtn = shadow.querySelector(".reject")!;
-
-    approveBtn.addEventListener("click", () => {
-      approveBtn.setAttribute("disabled", "true");
-      rejectBtn.setAttribute("disabled", "true");
-      this.classList.add("approved");
-      this.dispatchEvent(new CustomEvent("approve"));
-    });
-
-    rejectBtn.addEventListener("click", () => {
-      approveBtn.setAttribute("disabled", "true");
-      rejectBtn.setAttribute("disabled", "true");
-      this.classList.add("rejected");
-      this.dispatchEvent(new CustomEvent("reject"));
-    });
-  }
-}
-customElements.define("tool-approval-item", ToolApprovalItem);
-
-
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;
 let isRecognizing = false;

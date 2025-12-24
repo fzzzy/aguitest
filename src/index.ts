@@ -65,11 +65,13 @@ let isProcessing = false;
 class WelcomeMessage extends HTMLElement {
   connectedCallback() {
     const template = document.getElementById("template-welcome-message") as HTMLElement;
-    const node = template.cloneNode(true) as HTMLElement;
-    node.removeAttribute("id");
-    node.style.display = "";
-    node.textContent = this.textContent;
-    this.replaceWith(node);
+    const shadow = this.attachShadow({ mode: "open" });
+
+    const style = document.createElement("style");
+    style.textContent = `:host { ${template.style.cssText} display: block; }`;
+    shadow.appendChild(style);
+
+    shadow.appendChild(document.createElement("slot"));
   }
 }
 customElements.define("welcome-message", WelcomeMessage);

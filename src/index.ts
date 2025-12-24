@@ -4,14 +4,16 @@ import { registerComponents } from "./sfc";
 import { initSpeechRecognition } from "./speech";
 import type { ToolCall, SendButton, MessageInput } from "./components/elements";
 
-// Register SFC components
+
 registerComponents('./components/*.sfc.html');
+
 
 let messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
 let currentToolCall: ToolCall | null = null;
 let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
+
 
 const agent = new HttpAgent({
   url: "/agent",

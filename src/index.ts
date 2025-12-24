@@ -79,6 +79,7 @@ defineComponent("chat-input-container");
 defineComponent("attachments-container");
 defineComponent("input-wrapper");
 defineComponent("mic-button");
+defineComponent("typing-indicator");
 
 class ScrollAnchor extends HTMLElement {
   connectedCallback() {
@@ -517,22 +518,9 @@ function addMessage(role: "user" | "assistant", content: string): HTMLElement {
 
 function addTypingIndicator(): void {
   const messagesDiv = document.getElementById("messages")!;
-  const messageDiv = document.createElement("div");
-  messageDiv.className = "message assistant";
-  messageDiv.id = "typing-indicator";
-
-  const avatar = document.createElement("div");
-  avatar.className = "message-avatar";
-  avatar.textContent = "A";
-
-  const typingDiv = document.createElement("div");
-  typingDiv.className = "message-content";
-  typingDiv.innerHTML =
-    '<div class="typing-indicator"><span></span><span></span><span></span></div>';
-
-  messageDiv.appendChild(avatar);
-  messageDiv.appendChild(typingDiv);
-  messagesDiv.appendChild(messageDiv);
+  const indicator = document.createElement("typing-indicator");
+  indicator.id = "typing-indicator";
+  messagesDiv.appendChild(indicator);
   scrollToBottom();
 }
 

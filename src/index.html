@@ -13,19 +13,16 @@
         </chat-messages>
         <chat-input-container>
             <attachments-container id="attachments-container"></attachments-container>
-            <input-wrapper>
-                <input
-                    type="text"
-                    id="messageInput"
-                    placeholder="Type your message..."
-                    style="width: 100%; padding: 12px 44px 12px 16px; border: 2px solid #e0e0e0; border-radius: 24px; font-size: 14px; outline: none; transition: border-color 0.3s; box-sizing: border-box;"
-                >
-                <mic-button
-                    id="micButton"
-                    title="Start speech recognition"
-                    style="position: absolute; right: 8px;"></mic-button>
-            </input-wrapper>
-            <button id="attachButton" title="Attach file" style="background: #e8f5f1; color: #4a9b87; border: 2px solid #7dd3c0; width: 44px; height: 44px; border-radius: 50%; font-size: 24px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">+</button>
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="Type your message..."
+                style="flex: 1; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 24px; font-size: 14px; outline: none; transition: border-color 0.3s; box-sizing: border-box;"
+            >
+            <mic-button
+                id="micButton"
+                title="Start speech recognition"></mic-button>
+            <button id="attachButton" title="Attach file" style="background: transparent; color: #666; border: 2px solid transparent; width: 44px; height: 44px; border-radius: 50%; font-size: 24px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color 0.2s, color 0.2s;">+</button>
             <input type="file" id="fileInput" accept="text/*,image/*" style="display: none;">
             <button id="sendButton" style="background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%); color: white; border: none; padding: 12px 24px; border-radius: 24px; font-weight: 600; cursor: pointer;">Send</button>
         </chat-input-container>
@@ -501,19 +498,20 @@
         <style>
             :host {
                 background: transparent;
-                border: none;
-                width: 32px;
-                height: 32px;
+                border: 2px solid transparent;
+                width: 44px;
+                height: 44px;
                 border-radius: 50%;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                transition: background 0.2s, transform 0.2s;
+                transition: background 0.2s, transform 0.2s, border-color 0.2s;
                 color: #666;
+                flex-shrink: 0;
             }
             :host(:hover) {
-                background: #f0f0f0;
+                border-color: #7dd3c0;
                 color: #4a9b87;
             }
             :host(.recording) {
@@ -548,31 +546,6 @@
         <svg class="stop-icon" viewBox="0 0 24 24" width="20" height="20">
             <rect x="6" y="6" width="12" height="12" rx="2"/>
         </svg>
-    </template>
-    <template id="template-input-wrapper">
-        <style>
-            :host {
-                flex: 1;
-                position: relative;
-                display: flex;
-                align-items: center;
-            }
-        </style>
-        <slot></slot>
-    </template>
-    <template id="template-attachments-container">
-        <style>
-            :host {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-                width: 100%;
-            }
-            :host(:empty) {
-                display: none;
-            }
-        </style>
-        <slot></slot>
     </template>
     <script type="module" src="/index.ts"></script>
 </body>

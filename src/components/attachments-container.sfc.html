@@ -1,0 +1,14 @@
+<template>
+  <style>
+    :host {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      width: 100%;
+    }
+    :host(:empty) {
+      display: none;
+    }
+  </style>
+  <slot></slot>
+</template>

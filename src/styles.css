@@ -14,4 +14,9 @@ body {
     padding: 20px;
 }
 
+#attachButton:hover {
+    border-color: #7dd3c0;
+    color: #4a9b87;
+}
+
 

@@ -68,8 +68,6 @@ function defineComponent(name: string) {
   });
 }
 
-defineComponent("attachments-container");
-defineComponent("input-wrapper");
 defineComponent("mic-button");
 defineComponent("typing-indicator");
 

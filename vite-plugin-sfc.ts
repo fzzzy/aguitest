@@ -22,7 +22,7 @@ export function sfcPlugin(): Plugin {
     },
 
     async load(id: string) {
-      if (!id.endsWith('.sfc')) {
+      if (!id.endsWith('.sfc.html')) {
         return null
       }
 
@@ -35,17 +35,23 @@ export function sfcPlugin(): Plugin {
       if (!templateMatch) {
         throw new Error(`${id}: SFC must contain a <template> block`)
       }
-      if (!scriptMatch) {
-        throw new Error(`${id}: SFC must contain a <script> block`)
-      }
 
       const templateContent = templateMatch[1].trim()
-      const scriptContent = scriptMatch[1].trim()
+      const scriptContent = scriptMatch ? scriptMatch[1].trim() : 'export default defineComponent(template);'
 
       // Generate the transformed module
       const tsCode = `
 const template = document.createElement('template');
 template.innerHTML = ${JSON.stringify(templateContent)};
+
+function defineComponent(template: HTMLTemplateElement): CustomElementConstructor {
+  return class extends HTMLElement {
+    connectedCallback() {
+      this.attachShadow({ mode: 'open' });
+      this.shadowRoot!.appendChild(template.content.cloneNode(true));
+    }
+  };
+}
 
 ${scriptContent}
 `

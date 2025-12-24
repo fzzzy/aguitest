@@ -16,12 +16,3 @@
   </style>
   <div><h1><slot></slot></h1></div>
 </template>
-
-<script lang="ts">
-export default class extends HTMLElement {
-  connectedCallback() {
-    this.attachShadow({ mode: 'open' });
-    this.shadowRoot!.appendChild(template.content.cloneNode(true));
-  }
-}
-</script>

@@ -4,7 +4,7 @@ import "./styles.css";
 import { registerComponents } from "./sfc";
 
 // Register SFC components
-registerComponents('./components/*.sfc');
+registerComponents('./components/*.sfc.html');
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -68,7 +68,6 @@ function defineComponent(name: string) {
   });
 }
 
-defineComponent("chat-container");
 defineComponent("chat-messages");
 defineComponent("chat-input-container");
 defineComponent("attachments-container");

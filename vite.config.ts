@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
+import { sfcPlugin } from './vite-plugin-sfc'
 
 export default defineConfig({
+  plugins: [sfcPlugin()],
   root: 'src',
   build: {
     outDir: '../dist',

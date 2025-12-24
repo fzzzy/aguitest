@@ -1,6 +1,10 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
 import "./styles.css";
+import { registerComponents } from "./sfc";
+
+// Register SFC components
+registerComponents('./components/*.sfc');
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -66,7 +70,6 @@ function defineComponent(name: string) {
 
 defineComponent("chat-container");
 defineComponent("chat-messages");
-defineComponent("chat-header");
 defineComponent("chat-input-container");
 defineComponent("attachments-container");
 defineComponent("input-wrapper");

@@ -66,6 +66,11 @@ interface SendButton extends HTMLElement {
   disabled: boolean;
 }
 
+interface MessageInput extends HTMLElement {
+  value: string;
+  focus(): void;
+}
+
 
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;
@@ -97,7 +102,7 @@ function createRecognition(): SpeechRecognition {
   };
 
   rec.onresult = (event: SpeechRecognitionEvent) => {
-    const input = document.getElementById("messageInput") as HTMLInputElement;
+    const input = document.getElementById("messageInput") as MessageInput;
     let finalTranscript = "";
     let interimTranscript = "";
 
@@ -178,7 +183,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
     includeCustomEventHandler = true,
   } = options;
 
-  const input = document.getElementById("messageInput") as HTMLInputElement;
+  const input = document.getElementById("messageInput") as MessageInput;
   const sendButton = document.getElementById("sendButton") as SendButton;
 
   const subscriber: AgentSubscriber = {
@@ -401,7 +406,7 @@ async function continueWithApprovals(approvals: Record<string, boolean>): Promis
   } catch (error: any) {
     console.error("[Client] Error continuing with approvals:", error);
     showError(error.message || "Failed to continue with approvals");
-    const input = document.getElementById("messageInput") as HTMLInputElement;
+    const input = document.getElementById("messageInput") as MessageInput;
     const sendButton = document.getElementById("sendButton") as SendButton;
     isProcessing = false;
     sendButton.disabled = false;
@@ -459,7 +464,7 @@ function showError(message: string): void {
 
 
 async function sendMessage(): Promise<void> {
-  const input = document.getElementById("messageInput") as HTMLInputElement;
+  const input = document.getElementById("messageInput") as MessageInput;
   const sendButton = document.getElementById("sendButton") as SendButton;
   const messageText = input.value.trim();
 
@@ -562,9 +567,9 @@ function handleFileSelect(event: Event): void {
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  const messageInput = document.getElementById("messageInput") as HTMLInputElement;
+  const messageInput = document.getElementById("messageInput") as MessageInput;
   const sendButton = document.getElementById("sendButton") as SendButton;
-  const attachButton = document.getElementById("attachButton") as HTMLButtonElement;
+  const attachButton = document.getElementById("attachButton") as HTMLElement;
   const fileInput = document.getElementById("fileInput") as HTMLInputElement;
   const micButton = document.getElementById("micButton") as HTMLElement;
 

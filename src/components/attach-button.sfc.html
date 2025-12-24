@@ -1,0 +1,42 @@
+<template>
+  <style>
+    :host {
+      display: inline-flex;
+    }
+    button {
+      background: transparent;
+      color: #666;
+      border: 2px solid transparent;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: 24px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    button:hover {
+      border-color: #7dd3c0;
+      color: #4a9b87;
+    }
+  </style>
+  <button><slot>+</slot></button>
+</template>
+<script>
+export default class extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot!.appendChild(template.content.cloneNode(true));
+    const button = this.shadowRoot!.querySelector('button')!;
+
+    // Forward clicks
+    button.addEventListener('click', () => {
+      this.dispatchEvent(new Event('click'));
+    });
+  }
+}
+</script>

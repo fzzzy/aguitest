@@ -75,6 +75,20 @@ function defineComponent(name: string) {
 defineComponent("chat-container");
 defineComponent("chat-messages");
 defineComponent("chat-header");
+defineComponent("chat-input-container");
+defineComponent("attachments-container");
+defineComponent("input-wrapper");
+defineComponent("mic-button");
+
+class ScrollAnchor extends HTMLElement {
+  connectedCallback() {
+    if (document.querySelectorAll("scroll-anchor").length > 1) {
+      throw new Error("Only one scroll-anchor allowed in document");
+    }
+    this.style.fontSize = "1px";
+  }
+}
+customElements.define("scroll-anchor", ScrollAnchor);
 
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;
@@ -138,21 +152,14 @@ function createRecognition(): SpeechRecognition {
 
 function updateMicButtonUI(recording: boolean): void {
   const micButton = document.getElementById("micButton");
-  const micIcon = micButton?.querySelector(".mic-icon") as SVGElement | null;
-  const stopIcon = micButton?.querySelector(".stop-icon") as SVGElement | null;
-
-  if (!micButton || !micIcon || !stopIcon) return;
+  if (!micButton) return;
 
   if (recording) {
     micButton.classList.add("recording");
     micButton.title = "Stop speech recognition";
-    micIcon.style.display = "none";
-    stopIcon.style.display = "block";
   } else {
     micButton.classList.remove("recording");
     micButton.title = "Start speech recognition";
-    micIcon.style.display = "block";
-    stopIcon.style.display = "none";
   }
 }
 
@@ -609,7 +616,7 @@ function handleKeyPress(event: KeyboardEvent): void {
 
 
 function renderAttachmentChips(): void {
-  const container = document.getElementById("attachmentsContainer")!;
+  const container = document.getElementById("attachments-container")!;
   container.innerHTML = "";
 
   const attachments = agent.state?.attachments as Record<string, string> | undefined;
@@ -681,13 +688,11 @@ function handleFileSelect(event: Event): void {
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  const messageInput = document.getElementById(
-    "messageInput"
-  ) as HTMLInputElement;
+  const messageInput = document.getElementById("messageInput") as HTMLInputElement;
   const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
   const attachButton = document.getElementById("attachButton") as HTMLButtonElement;
   const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-  const micButton = document.getElementById("micButton") as HTMLButtonElement;
+  const micButton = document.getElementById("micButton") as HTMLElement;
 
   messageInput.addEventListener("keypress", handleKeyPress);
   sendButton.addEventListener("click", sendMessage);

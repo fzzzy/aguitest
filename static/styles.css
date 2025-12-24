@@ -20,10 +20,6 @@ body {
     animation: fadeIn 0.3s ease-in;
 }
 
-#scroll-anchor {
-    font-size: 1px;
-}
-
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -76,124 +72,6 @@ body {
 .message.assistant .message-content {
     background: #e8f5f1;
     color: #2d6a5c;
-}
-
-.chat-input-container {
-    padding: 20px;
-    border-top: 1px solid #e0e0e0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.input-wrapper {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.chat-input {
-    width: 100%;
-    padding: 12px 44px 12px 16px;
-    border: 2px solid #e0e0e0;
-    border-radius: 24px;
-    font-size: 14px;
-    outline: none;
-    transition: border-color 0.3s;
-}
-
-.chat-input:focus {
-    border-color: #7dd3c0;
-}
-
-.mic-button {
-    position: absolute;
-    right: 8px;
-    background: transparent;
-    border: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, transform 0.2s;
-    color: #666;
-}
-
-.mic-button:hover {
-    background: #f0f0f0;
-    color: #4a9b87;
-}
-
-.mic-button.recording {
-    background: #ffebee;
-    color: #d32f2f;
-    animation: pulse 1.5s infinite;
-}
-
-.mic-button.recording:hover {
-    background: #ffcdd2;
-}
-
-.mic-button svg {
-    fill: currentColor;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.1);
-    }
-}
-
-.attach-button {
-    background: #e8f5f1;
-    color: #4a9b87;
-    border: 2px solid #7dd3c0;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    font-size: 24px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.attach-button:hover {
-    background: #7dd3c0;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(125, 211, 192, 0.4);
-}
-
-.send-button {
-    background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 24px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.send-button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(125, 211, 192, 0.4);
-}
-
-.send-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
 }
 
 .typing-indicator {
@@ -362,17 +240,6 @@ body {
 .approve-btn:disabled, .reject-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.attachments-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-}
-
-.attachments-container:empty {
-    display: none;
 }
 
 .attachment-chip {

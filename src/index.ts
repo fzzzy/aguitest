@@ -68,9 +68,6 @@ function defineComponent(name: string) {
   });
 }
 
-defineComponent("mic-button");
-defineComponent("typing-indicator");
-
 class ChatMessage extends HTMLElement {
   connectedCallback() {
     const template = document.getElementById("template-chat-message") as HTMLTemplateElement;

@@ -54,11 +54,8 @@ new EventSource('http://localhost:8001/esbuild').addEventListener('change', () =
 
 let messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
-let currentToolCall: HTMLElement | null = null;
-let toolCallsMap: Record<
-  string,
-  { name: string; args: string; element: HTMLElement }
-> = {};
+let currentToolCall: ToolCall | null = null;
+let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
 
 // Web Components
@@ -141,6 +138,37 @@ class AttachmentPreview extends HTMLElement {
 customElements.define("attachment-preview", AttachmentPreview);
 
 defineComponent("tool-approval");
+
+class ToolCall extends HTMLElement {
+  private argsEl: Element | null = null;
+
+  connectedCallback() {
+    const template = document.getElementById("template-tool-call") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+    const toolName = this.getAttribute("name") || "";
+    shadow.querySelector(".name")!.textContent = `🔧 Calling tool: ${toolName}`;
+    this.argsEl = shadow.querySelector(".args")!;
+  }
+
+  appendArgs(delta: string) {
+    if (this.argsEl) {
+      this.argsEl.textContent += delta;
+    }
+  }
+}
+customElements.define("tool-call", ToolCall);
+
+class ToolResult extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-tool-result") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+    const content = this.getAttribute("content") || "";
+    shadow.querySelector(".content")!.textContent = content;
+  }
+}
+customElements.define("tool-result", ToolResult);
 
 class ToolApprovalItem extends HTMLElement {
   connectedCallback() {
@@ -360,25 +388,22 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
   if (includeToolCallHandlers) {
     subscriber.onToolCallStartEvent = (params) => {
       console.log("[Client] Tool call started:", params.event.toolCallName);
-      const toolContent = `<div class="tool-call">🔧 Calling tool: ${params.event.toolCallName}</div><div class="tool-args" id="tool-args-${params.event.toolCallId}">Arguments: </div>`;
-      currentToolCall = addToolMessage(toolContent);
-      toolCallsMap[params.event.toolCallId] = {
-        name: params.event.toolCallName,
-        args: "",
-        element: currentToolCall,
-      };
+      const messagesDiv = document.getElementById("messages")!;
+      const spacer = document.getElementById("scroll-anchor")!;
+      const toolCall = document.createElement("tool-call") as ToolCall;
+      toolCall.setAttribute("name", params.event.toolCallName);
+      messagesDiv.insertBefore(toolCall, spacer);
+      scrollToBottom();
+      currentToolCall = toolCall;
+      toolCallsMap[params.event.toolCallId] = toolCall;
     };
 
     subscriber.onToolCallArgsEvent = (params) => {
       const toolCallId = params.event.toolCallId;
       if (toolCallId in toolCallsMap && params.event.delta) {
         console.log("[Client] Tool call args delta:", params.event.delta);
-        toolCallsMap[toolCallId].args += params.event.delta;
-        const argsDiv = document.getElementById("tool-args-" + toolCallId);
-        if (argsDiv) {
-          argsDiv.textContent = "Arguments: " + toolCallsMap[toolCallId].args;
-          scrollToBottom();
-        }
+        toolCallsMap[toolCallId].appendArgs(params.event.delta);
+        scrollToBottom();
       }
     };
 
@@ -389,9 +414,12 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
 
     subscriber.onToolCallResultEvent = (params) => {
       console.log("[Client] Tool call result:", params.event.toolCallId);
-      const resultText = params.event.content || "No result";
-      const resultContent = `<div class="tool-call">✅ Tool result</div><div class="tool-args">${resultText}</div>`;
-      addToolMessage(resultContent, true);
+      const messagesDiv = document.getElementById("messages")!;
+      const spacer = document.getElementById("scroll-anchor")!;
+      const toolResult = document.createElement("tool-result");
+      toolResult.setAttribute("content", params.event.content || "No result");
+      messagesDiv.insertBefore(toolResult, spacer);
+      scrollToBottom();
     };
 
     subscriber.onStepStartedEvent = (params) => {
@@ -574,20 +602,6 @@ function showError(message: string): void {
   scrollToBottom();
 }
 
-
-function addToolMessage(
-  content: string,
-  isResult: boolean = false
-): HTMLElement {
-  const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-anchor")!;
-  const toolDiv = document.createElement("div");
-  toolDiv.className = isResult ? "tool-message tool-result" : "tool-message";
-  toolDiv.innerHTML = content;
-  messagesDiv.insertBefore(toolDiv, spacer);
-  scrollToBottom();
-  return toolDiv;
-}
 
 
 async function sendMessage(): Promise<void> {

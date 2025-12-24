@@ -23,32 +23,3 @@ body {
     margin: 8px 0;
 }
 
-.tool-message {
-    background: #fff3e0;
-    border-left: 4px solid #ff9800;
-    padding: 12px;
-    margin: 8px 0;
-    border-radius: 4px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    font-size: 14px;
-}
-
-.tool-call {
-    color: #e65100;
-    font-weight: 600;
-}
-
-.tool-args {
-    color: #f57c00;
-    margin-left: 20px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tool-result {
-    background: #e8f5e9;
-    border-left: 4px solid #4caf50;
-    color: #2e7d32;
-}
-

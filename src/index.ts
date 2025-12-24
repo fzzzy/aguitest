@@ -1,151 +1,17 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
 import { registerComponents } from "./sfc";
+import { initSpeechRecognition } from "./speech";
 import type { ToolCall, SendButton, MessageInput } from "./components/elements";
 
 // Register SFC components
 registerComponents('./components/*.sfc.html');
-
-// Web Speech API types
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  isFinal: boolean;
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onerror: ((this: SpeechRecognition, ev: Event & { error: string }) => void) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
-  onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition: new () => SpeechRecognition;
-    SpeechRecognition: new () => SpeechRecognition;
-  }
-}
 
 let messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
 let currentToolCall: ToolCall | null = null;
 let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
-
-// Speech recognition state
-let recognition: SpeechRecognition | null = null;
-let isRecognizing = false;
-
-function createRecognition(): SpeechRecognition {
-  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SpeechRecognitionAPI();
-  rec.continuous = false;
-  rec.interimResults = true;
-  rec.lang = "en-US";
-
-  rec.onstart = () => {
-    console.log("[Speech] Recognition started");
-    isRecognizing = true;
-    updateMicButtonUI(true);
-  };
-
-  rec.onend = () => {
-    console.log("[Speech] Recognition ended");
-    isRecognizing = false;
-    updateMicButtonUI(false);
-  };
-
-  rec.onerror = (event) => {
-    console.error("[Speech] Recognition error:", event.error);
-    isRecognizing = false;
-    updateMicButtonUI(false);
-  };
-
-  rec.onresult = (event: SpeechRecognitionEvent) => {
-    const input = document.getElementById("messageInput") as MessageInput;
-    let finalTranscript = "";
-    let interimTranscript = "";
-
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        finalTranscript += transcript;
-      } else {
-        interimTranscript += transcript;
-      }
-    }
-
-    if (finalTranscript) {
-      input.value = finalTranscript;
-      console.log("[Speech] Final transcript:", finalTranscript);
-    } else if (interimTranscript) {
-      input.value = interimTranscript;
-      console.log("[Speech] Interim transcript:", interimTranscript);
-    }
-  };
-
-  rec.onspeechend = () => {
-    console.log("[Speech] Speech ended");
-    rec.stop();
-  };
-
-  return rec;
-}
-
-function updateMicButtonUI(recording: boolean): void {
-  const micButton = document.getElementById("micButton");
-  if (!micButton) return;
-
-  if (recording) {
-    micButton.classList.add("recording");
-    micButton.title = "Stop speech recognition";
-  } else {
-    micButton.classList.remove("recording");
-    micButton.title = "Start speech recognition";
-  }
-}
-
-function startRecognition(): void {
-  if (isRecognizing) {
-    recognition?.stop();
-    return;
-  }
-
-  if (!recognition) {
-    recognition = createRecognition();
-  }
-
-  try {
-    recognition.start();
-  } catch (error) {
-    console.error("[Speech] Failed to start recognition:", error);
-  }
-}
 
 const agent = new HttpAgent({
   url: "/agent",
@@ -566,12 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   fileInput.addEventListener("change", handleFileSelect);
 
-  // Speech recognition button - only show if supported
-  if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-    micButton.addEventListener("click", startRecognition);
-  } else {
-    micButton.style.display = "none";
-  }
+  initSpeechRecognition(messageInput, micButton);
 
   messageInput.focus();
 

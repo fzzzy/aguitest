@@ -120,6 +120,26 @@ class AttachmentChip extends HTMLElement {
 }
 customElements.define("attachment-chip", AttachmentChip);
 
+class AttachmentPreview extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-attachment-preview") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+    const filename = this.getAttribute("filename") || "";
+    const nameEl = shadow.querySelector(".name") as HTMLElement;
+    nameEl.textContent = `📎 ${filename}`;
+    nameEl.title = filename;
+    const iframe = shadow.querySelector("iframe")!;
+    iframe.src = this.getAttribute("src") || "";
+    iframe.title = filename;
+    const header = shadow.querySelector(".header")!;
+    header.addEventListener("click", () => {
+      this.classList.toggle("expanded");
+    });
+  }
+}
+customElements.define("attachment-preview", AttachmentPreview);
+
 class ScrollAnchor extends HTMLElement {
   connectedCallback() {
     if (document.querySelectorAll("scroll-anchor").length > 1) {
@@ -375,41 +395,10 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         const spacer = document.getElementById("scroll-anchor")!;
 
         for (const [filename, dataUrl] of Object.entries(attachments)) {
-          const previewDiv = document.createElement("div");
-          previewDiv.className = "attachment-preview";
-
-          const header = document.createElement("div");
-          header.className = "attachment-preview-header";
-
-          const toggle = document.createElement("span");
-          toggle.className = "attachment-preview-toggle";
-          toggle.textContent = "▶";
-
-          const nameSpan = document.createElement("span");
-          nameSpan.className = "attachment-preview-name";
-          nameSpan.textContent = `📎 ${filename}`;
-          nameSpan.title = filename;
-
-          header.appendChild(toggle);
-          header.appendChild(nameSpan);
-
-          const content = document.createElement("div");
-          content.className = "attachment-preview-content";
-
-          const iframe = document.createElement("iframe");
-          iframe.className = "attachment-preview-iframe";
-          iframe.src = dataUrl;
-          iframe.title = filename;
-
-          content.appendChild(iframe);
-          previewDiv.appendChild(header);
-          previewDiv.appendChild(content);
-
-          header.addEventListener("click", () => {
-            previewDiv.classList.toggle("expanded");
-          });
-
-          messagesDiv.insertBefore(previewDiv, spacer);
+          const preview = document.createElement("attachment-preview");
+          preview.setAttribute("filename", filename);
+          preview.setAttribute("src", dataUrl);
+          messagesDiv.insertBefore(preview, spacer);
         }
 
         scrollToBottom();

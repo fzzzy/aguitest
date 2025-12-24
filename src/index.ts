@@ -103,6 +103,23 @@ class CustomEventDisplay extends HTMLElement {
 }
 customElements.define("custom-event-display", CustomEventDisplay);
 
+class AttachmentChip extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-attachment-chip") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+    const filename = this.getAttribute("filename") || "";
+    const nameEl = shadow.querySelector(".name")!;
+    nameEl.textContent = filename;
+    (nameEl as HTMLElement).title = filename;
+    const removeBtn = shadow.querySelector(".remove")!;
+    removeBtn.addEventListener("click", () => {
+      this.dispatchEvent(new CustomEvent("remove", { detail: filename }));
+    });
+  }
+}
+customElements.define("attachment-chip", AttachmentChip);
+
 class ScrollAnchor extends HTMLElement {
   connectedCallback() {
     if (document.querySelectorAll("scroll-anchor").length > 1) {
@@ -622,22 +639,9 @@ function renderAttachmentChips(): void {
   if (!attachments || Object.keys(attachments).length === 0) return;
 
   for (const filename of Object.keys(attachments)) {
-    const chip = document.createElement("div");
-    chip.className = "attachment-chip";
-
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "attachment-chip-name";
-    nameSpan.textContent = filename;
-    nameSpan.title = filename;
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "attachment-chip-remove";
-    removeBtn.textContent = "×";
-    removeBtn.title = "Remove attachment";
-    removeBtn.addEventListener("click", () => removeAttachment(filename));
-
-    chip.appendChild(nameSpan);
-    chip.appendChild(removeBtn);
+    const chip = document.createElement("attachment-chip");
+    chip.setAttribute("filename", filename);
+    chip.addEventListener("remove", () => removeAttachment(filename));
     container.appendChild(chip);
   }
 }

@@ -1,0 +1,10 @@
+<script>
+export default class extends HTMLElement {
+  connectedCallback() {
+    if (document.querySelectorAll("scroll-anchor").length > 1) {
+      throw new Error("Only one scroll-anchor allowed in document");
+    }
+    this.style.fontSize = "1px";
+  }
+}
+</script>

@@ -180,15 +180,6 @@ class ToolApprovalItem extends HTMLElement {
 }
 customElements.define("tool-approval-item", ToolApprovalItem);
 
-class ScrollAnchor extends HTMLElement {
-  connectedCallback() {
-    if (document.querySelectorAll("scroll-anchor").length > 1) {
-      throw new Error("Only one scroll-anchor allowed in document");
-    }
-    this.style.fontSize = "1px";
-  }
-}
-customElements.define("scroll-anchor", ScrollAnchor);
 
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;

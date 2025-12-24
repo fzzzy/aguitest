@@ -32,15 +32,18 @@ export function sfcPlugin(): Plugin {
       const templateMatch = code.match(/<template>([\s\S]*?)<\/template>/)
       const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/)
 
-      if (!templateMatch) {
-        throw new Error(`${id}: SFC must contain a <template> block`)
+      const hasTemplate = !!templateMatch
+      const templateContent = templateMatch ? templateMatch[1].trim() : ''
+
+      // Script is required if no template, otherwise defaults to defineComponent
+      if (!hasTemplate && !scriptMatch) {
+        throw new Error(`${id}: SFC must contain a <template> or <script> block`)
       }
 
-      const templateContent = templateMatch[1].trim()
       const scriptContent = scriptMatch ? scriptMatch[1].trim() : 'export default defineComponent(template);'
 
       // Generate the transformed module
-      const tsCode = `
+      const templateCode = hasTemplate ? `
 const template = document.createElement('template');
 template.innerHTML = ${JSON.stringify(templateContent)};
 
@@ -52,7 +55,9 @@ function defineComponent(template: HTMLTemplateElement): CustomElementConstructo
     }
   };
 }
+` : ''
 
+      const tsCode = `${templateCode}
 ${scriptContent}
 `
       // Transform TypeScript to JavaScript

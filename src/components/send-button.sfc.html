@@ -1,0 +1,56 @@
+<template>
+  <style>
+    :host {
+      display: inline-block;
+    }
+    button {
+      background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  </style>
+  <button><slot>Send</slot></button>
+</template>
+<script>
+export default class extends HTMLElement {
+  private button: HTMLButtonElement | null = null;
+
+  connectedCallback() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot!.appendChild(template.content.cloneNode(true));
+    this.button = this.shadowRoot!.querySelector('button');
+
+    // Forward clicks
+    this.button!.addEventListener('click', () => {
+      this.dispatchEvent(new Event('click'));
+    });
+
+    // Sync initial disabled state
+    if (this.hasAttribute('disabled')) {
+      this.button!.disabled = true;
+    }
+  }
+
+  get disabled(): boolean {
+    return this.button?.disabled ?? false;
+  }
+
+  set disabled(value: boolean) {
+    if (this.button) {
+      this.button.disabled = value;
+    }
+  }
+}
+</script>

@@ -62,6 +62,10 @@ interface ToolCall extends HTMLElement {
   appendArgs(delta: string): void;
 }
 
+interface SendButton extends HTMLElement {
+  disabled: boolean;
+}
+
 
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;
@@ -175,7 +179,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
   } = options;
 
   const input = document.getElementById("messageInput") as HTMLInputElement;
-  const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+  const sendButton = document.getElementById("sendButton") as SendButton;
 
   const subscriber: AgentSubscriber = {
     onRunStartedEvent: (_params) => {
@@ -398,7 +402,7 @@ async function continueWithApprovals(approvals: Record<string, boolean>): Promis
     console.error("[Client] Error continuing with approvals:", error);
     showError(error.message || "Failed to continue with approvals");
     const input = document.getElementById("messageInput") as HTMLInputElement;
-    const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+    const sendButton = document.getElementById("sendButton") as SendButton;
     isProcessing = false;
     sendButton.disabled = false;
     input.focus();
@@ -456,7 +460,7 @@ function showError(message: string): void {
 
 async function sendMessage(): Promise<void> {
   const input = document.getElementById("messageInput") as HTMLInputElement;
-  const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+  const sendButton = document.getElementById("sendButton") as SendButton;
   const messageText = input.value.trim();
 
   if (!messageText || isProcessing) return;
@@ -559,7 +563,7 @@ function handleFileSelect(event: Event): void {
 
 document.addEventListener("DOMContentLoaded", () => {
   const messageInput = document.getElementById("messageInput") as HTMLInputElement;
-  const sendButton = document.getElementById("sendButton") as HTMLButtonElement;
+  const sendButton = document.getElementById("sendButton") as SendButton;
   const attachButton = document.getElementById("attachButton") as HTMLButtonElement;
   const fileInput = document.getElementById("fileInput") as HTMLInputElement;
   const micButton = document.getElementById("micButton") as HTMLElement;

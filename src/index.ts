@@ -92,6 +92,17 @@ class ChatMessage extends HTMLElement {
 }
 customElements.define("chat-message", ChatMessage);
 
+class CustomEventDisplay extends HTMLElement {
+  connectedCallback() {
+    const template = document.getElementById("template-custom-event") as HTMLTemplateElement;
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.appendChild(template.content.cloneNode(true));
+    const nameEl = shadow.querySelector(".name")!;
+    nameEl.textContent = this.getAttribute("name") || "";
+  }
+}
+customElements.define("custom-event-display", CustomEventDisplay);
+
 class ScrollAnchor extends HTMLElement {
   connectedCallback() {
     if (document.querySelectorAll("scroll-anchor").length > 1) {
@@ -327,11 +338,11 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
 
       // Handle instructions event - insert at the beginning (before user message)
       if (params.event.name === "instructions") {
-        const customDiv = document.createElement("div");
-        customDiv.className = "custom-event";
-        customDiv.innerHTML = `<div class="custom-event-name">📜 ${params.event.name}</div><div class="custom-event-value">${typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2)}</div>`;
+        const eventEl = document.createElement("custom-event-display");
+        eventEl.setAttribute("name", `📜 ${params.event.name}`);
+        eventEl.textContent = typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2);
         const messagesDiv = document.getElementById("messages")!;
-        messagesDiv.insertBefore(customDiv, messagesDiv.firstChild);
+        messagesDiv.insertBefore(eventEl, messagesDiv.firstChild);
         scrollToBottom();
         return;
       }
@@ -453,12 +464,12 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         return;
       }
 
-      const customDiv = document.createElement("div");
-      customDiv.className = "custom-event";
-      customDiv.innerHTML = `<div class="custom-event-name">📌 ${params.event.name}</div><div class="custom-event-value">${typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2)}</div>`;
+      const eventEl = document.createElement("custom-event-display");
+      eventEl.setAttribute("name", `📌 ${params.event.name}`);
+      eventEl.textContent = typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2);
       const messagesDiv = document.getElementById("messages")!;
       const spacer = document.getElementById("scroll-anchor")!;
-      messagesDiv.insertBefore(customDiv, spacer);
+      messagesDiv.insertBefore(eventEl, spacer);
       scrollToBottom();
     };
   }

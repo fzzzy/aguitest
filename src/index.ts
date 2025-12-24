@@ -62,25 +62,19 @@ let toolCallsMap: Record<
 let isProcessing = false;
 
 // Web Components
-class WelcomeMessage extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-welcome-message") as HTMLElement;
-    const shadow = this.attachShadow({ mode: "open" });
-
-    const style = document.createElement("style");
-    style.textContent = `:host { ${template.style.cssText} display: block; }`;
-    shadow.appendChild(style);
-
-    shadow.appendChild(document.createElement("slot"));
-  }
+function defineComponent(name: string) {
+  customElements.define(name, class extends HTMLElement {
+    connectedCallback() {
+      const template = document.getElementById(`template-${name}`) as HTMLTemplateElement;
+      const shadow = this.attachShadow({ mode: "open" });
+      shadow.appendChild(template.content.cloneNode(true));
+    }
+  });
 }
-customElements.define("welcome-message", WelcomeMessage);
 
-function welcome_message(text: string): HTMLElement {
-  const el = document.createElement("welcome-message");
-  el.textContent = text;
-  return el;
-}
+defineComponent("chat-container");
+defineComponent("chat-messages");
+defineComponent("chat-header");
 
 // Speech recognition state
 let recognition: SpeechRecognition | null = null;
@@ -709,10 +703,6 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     micButton.style.display = "none";
   }
-
-  // Add dynamic welcome node
-  const messagesDiv = document.getElementById("messages")!;
-  messagesDiv.insertBefore(welcome_message("Welcome!"), messagesDiv.firstChild);
 
   messageInput.focus();
 });

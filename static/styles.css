@@ -14,39 +14,6 @@ body {
     padding: 20px;
 }
 
-.chat-container {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    width: 100%;
-    max-width: 800px;
-    height: 90vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-header {
-    background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 12px 12px 0 0;
-    text-align: center;
-}
-
-.chat-header h1 {
-    font-size: 24px;
-    font-weight: 600;
-}
-
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 7px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
 .message {
     display: flex;
     gap: 12px;

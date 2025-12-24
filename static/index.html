@@ -7,13 +7,11 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>AG-UI Chat</h1>
-        </div>
-        <div class="chat-messages" id="messages">
+    <chat-container>
+        <chat-header>AG-UI Chat</chat-header>
+        <chat-messages id="messages">
             <div id="scroll-anchor">&nbsp;</div>
-        </div>
+        </chat-messages>
         <div class="chat-input-container">
             <div class="attachments-container" id="attachmentsContainer"></div>
             <div class="input-wrapper">
@@ -37,8 +35,57 @@
             <input type="file" id="fileInput" accept="text/*,image/*" style="display: none;">
             <button class="send-button" id="sendButton">Send</button>
         </div>
-    </div>
-    <div id="template-welcome-message" style="display: none; color: #666; font-style: italic; padding: 8px; text-align: center; font-size: 12px;"></div>
+    </chat-container>
+    <template id="template-chat-messages">
+        <style>
+            :host {
+                flex: 1;
+                display: flex;
+            }
+            div {
+                flex: 1;
+                overflow-y: auto;
+                padding: 1.5em;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+            }
+        </style>
+        <div><slot></slot></div>
+    </template>
+    <template id="template-chat-container">
+        <style>
+            :host {
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+                width: 100%;
+                max-width: 800px;
+                height: 90vh;
+                display: flex;
+                flex-direction: column;
+            }
+        </style>
+        <slot></slot>
+    </template>
+    <template id="template-chat-header">
+        <style>
+            div {
+                box-sizing: border-box;
+                background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
+                color: white;
+                padding: 20px;
+                border-radius: 12px 12px 0 0;
+                text-align: center;
+            }
+            h1 {
+                font-size: 24px;
+                font-weight: 600;
+                margin: 0;
+            }
+        </style>
+        <div><h1><slot></slot></h1></div>
+    </template>
     <script type="module" src="/dist/index.js"></script>
 </body>
 </html>

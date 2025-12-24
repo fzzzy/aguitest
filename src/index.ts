@@ -59,23 +59,6 @@ let isProcessing = false;
 
 // Web Components
 
-class AttachmentChip extends HTMLElement {
-  connectedCallback() {
-    const template = document.getElementById("template-attachment-chip") as HTMLTemplateElement;
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(template.content.cloneNode(true));
-    const filename = this.getAttribute("filename") || "";
-    const nameEl = shadow.querySelector(".name")!;
-    nameEl.textContent = filename;
-    (nameEl as HTMLElement).title = filename;
-    const removeBtn = shadow.querySelector(".remove")!;
-    removeBtn.addEventListener("click", () => {
-      this.dispatchEvent(new CustomEvent("remove", { detail: filename }));
-    });
-  }
-}
-customElements.define("attachment-chip", AttachmentChip);
-
 class AttachmentPreview extends HTMLElement {
   connectedCallback() {
     const template = document.getElementById("template-attachment-preview") as HTMLTemplateElement;

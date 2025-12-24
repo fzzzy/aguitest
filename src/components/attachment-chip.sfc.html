@@ -1,0 +1,67 @@
+<template>
+  <style>
+    :host {
+      display: inline-flex;
+      animation: fadeIn 0.2s ease-in;
+    }
+    .wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #e8f5f1;
+      border: 1px solid #7dd3c0;
+      border-radius: 16px;
+      padding: 4px 8px 4px 12px;
+      font-size: 13px;
+      color: #2d6a5c;
+    }
+    .name {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .remove {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      background: #7dd3c0;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .remove:hover {
+      background: #4a9b87;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <div class="wrapper">
+    <span class="name"></span>
+    <button class="remove" title="Remove attachment">×</button>
+  </div>
+</template>
+<script>
+export default class extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot!.appendChild(template.content.cloneNode(true));
+    const filename = this.getAttribute("filename") || "";
+    const nameEl = this.shadowRoot!.querySelector(".name") as HTMLElement;
+    nameEl.textContent = filename;
+    nameEl.title = filename;
+    const removeBtn = this.shadowRoot!.querySelector(".remove")!;
+    removeBtn.addEventListener("click", () => {
+      this.dispatchEvent(new CustomEvent("remove", { detail: filename }));
+    });
+  }
+}
+</script>

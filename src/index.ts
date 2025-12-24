@@ -693,7 +693,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const messagesDiv = document.getElementById("messages")!;
   const welcomeDiv = document.createElement("div");
   welcomeDiv.className = "system-message";
-  welcomeDiv.textContent = "Welcome! Hot reload test v2.";
+  welcomeDiv.textContent = "Welcome!";
   messagesDiv.insertBefore(welcomeDiv, messagesDiv.firstChild);
 
   messageInput.focus();

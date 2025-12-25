@@ -44,6 +44,14 @@ class Dependencies:
     pass
 
 
+@dataclass
+class Session:
+    """Holds state for each connected client session."""
+    agent: Agent
+    queue: asyncio.Queue
+    current_task: asyncio.Task | None = None
+
+
 toolset = FunctionToolset()
 
 
@@ -98,36 +106,38 @@ toolset.add_function(
 #    deps_type=StateDeps[Dependencies],
 #)
 
-agent = Agent(
-    "openai-responses:gpt-5.2",
-    system_prompt=AGENT_INSTRUCTIONS,
-    toolsets=[toolset],
-    output_type=[DeferredToolRequests, str],
-    deps_type=StateDeps[Dependencies],
-)
+def create_agent() -> Agent:
+    """Create a new agent instance for a session."""
+    return Agent(
+        "openai-responses:gpt-5.2",
+        system_prompt=AGENT_INSTRUCTIONS,
+        toolsets=[toolset],
+        output_type=[DeferredToolRequests, str],
+        deps_type=StateDeps[Dependencies],
+    )
 
 
 app = FastAPI()
 
-# Global dictionary: token (str) -> asyncio.Queue
-event_queues: dict[str, asyncio.Queue] = {}
+# Global dictionary: token (str) -> Session
+sessions: dict[str, Session] = {}
 
 
-async def ping_all_queues():
+async def ping_all_sessions():
     """Send a ping to all connected clients every minute."""
     while True:
         await asyncio.sleep(60)
         ping_event = {"ping": True}
-        for queue in event_queues.values():
+        for session in sessions.values():
             try:
-                queue.put_nowait(ping_event)
+                session.queue.put_nowait(ping_event)
             except asyncio.QueueFull:
                 pass
 
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(ping_all_queues())
+    asyncio.create_task(ping_all_sessions())
 
 
 def process_text_attachment(base64_data: str, filename: str) -> TextInputContent:
@@ -197,10 +207,13 @@ def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
 
 @app.post("/events")
 async def events(request: Request):
-    """SSE endpoint that creates a session and streams events."""
+    """SSE endpoint that creates a session with its own agent and streams events."""
     token = str(uuid4())
-    queue: asyncio.Queue = asyncio.Queue()
-    event_queues[token] = queue
+    session = Session(
+        agent=create_agent(),
+        queue=asyncio.Queue(),
+    )
+    sessions[token] = session
 
     agent_url = f"/agent?token={token}"
 
@@ -212,21 +225,33 @@ async def events(request: Request):
 
             # Loop forever reading from queue
             while True:
-                event = await queue.get()
+                event = await session.queue.get()
                 yield f"data: {json.dumps(event)}\n\n"
         except asyncio.CancelledError:
             pass
         finally:
-            event_queues.pop(token, None)
+            # Cancel any running task before cleanup
+            if session.current_task and not session.current_task.done():
+                session.current_task.cancel()
+            sessions.pop(token, None)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post("/agent")
 async def agent_run(request: Request, run_input: RunAgentInput, token: str):
-    # Validate token exists in global dictionary
-    if token not in event_queues:
+    # Validate token and get session
+    session = sessions.get(token)
+    if not session:
         raise HTTPException(status_code=404, detail="Invalid or expired token")
+
+    # Cancel any currently running task
+    if session.current_task and not session.current_task.done():
+        session.current_task.cancel()
+        try:
+            await session.current_task
+        except asyncio.CancelledError:
+            pass
 
     deferred_tool_requests = {}
     deps = StateDeps(Dependencies())
@@ -258,7 +283,7 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
             attachments_info = process_attachments(run_input)
 
         ag_ui_events = run_ag_ui(
-            agent,
+            session.agent,
             run_input,
             deferred_tool_results=deferred_tool_results,
             on_complete=on_complete_callback,

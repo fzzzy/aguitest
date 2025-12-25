@@ -1,0 +1,45 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      padding: 4px 12px;
+      margin: 4px 0;
+      background: #fff3e0;
+      border-left: 3px solid #ff9800;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      color: #e65100;
+    }
+    .ping-text {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ping-dot {
+      width: 8px;
+      height: 8px;
+      background: #ff9800;
+      border-radius: 50%;
+      animation: pulse 1s ease-out;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+  </style>
+  <div class="ping-text">
+    <span class="ping-dot"></span>
+    <span class="timestamp"></span>
+  </div>
+</template>
+<script>
+export default class extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot!.appendChild(template.content.cloneNode(true));
+    const timestamp = new Date().toLocaleTimeString();
+    this.shadowRoot!.querySelector(".timestamp")!.textContent = `ping received at ${timestamp}`;
+  }
+}
+</script>

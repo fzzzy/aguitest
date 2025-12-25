@@ -14,10 +14,97 @@ let currentToolCall: ToolCall | null = null;
 let toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
 
+let agent: HttpAgent;
+let eventsReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
-const agent = new HttpAgent({
-  url: "/agent",
-});
+
+async function connectToEvents(): Promise<string> {
+  const response = await fetch("/events", { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Failed to connect to events: ${response.status}`);
+  }
+
+  const reader = response.body!.getReader();
+  eventsReader = reader;
+  const decoder = new TextDecoder();
+
+  // Read the first event to get the agent URL
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) throw new Error("Events stream closed before receiving agent URL");
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = JSON.parse(line.slice(6));
+        if (data.agent) {
+          // Start listening for pings in background
+          listenForPings(reader, decoder, buffer.slice(buffer.indexOf("\n\n") + 2));
+          return data.agent;
+        }
+      }
+    }
+  }
+}
+
+
+function listenForPings(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  decoder: TextDecoder,
+  initialBuffer: string
+): void {
+  let buffer = initialBuffer;
+
+  async function processStream() {
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          console.log("[Client] Events stream closed");
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf("\n\n")) !== -1) {
+          const message = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 2);
+
+          if (message.startsWith("data: ")) {
+            const data = JSON.parse(message.slice(6));
+            if (data.ping) {
+              addPingIndicator();
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[Client] Error reading events stream:", error);
+    }
+  }
+
+  processStream();
+}
+
+
+function addPingIndicator(): void {
+  const messagesDiv = document.getElementById("messages");
+  if (!messagesDiv) return;
+
+  const spacer = document.getElementById("scroll-anchor");
+  const pingEl = document.createElement("ping-indicator");
+  if (spacer) {
+    messagesDiv.insertBefore(pingEl, spacer);
+  } else {
+    messagesDiv.appendChild(pingEl);
+  }
+  scrollToBottom();
+}
 
 
 interface SubscriberOptions {
@@ -419,12 +506,26 @@ function handleFileSelect(event: Event): void {
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const messageInput = document.getElementById("messageInput") as MessageInput;
   const sendButton = document.getElementById("sendButton") as SendButton;
   const attachButton = document.getElementById("attachButton") as HTMLElement;
   const fileInput = document.getElementById("fileInput") as HTMLInputElement;
   const micButton = document.getElementById("micButton") as HTMLElement;
+
+  // Connect to events endpoint first to get agent URL
+  try {
+    const agentUrl = await connectToEvents();
+    console.log("[Client] Connected to events, agent URL:", agentUrl);
+
+    agent = new HttpAgent({
+      url: agentUrl,
+    });
+  } catch (error) {
+    console.error("[Client] Failed to connect to events:", error);
+    showError("Failed to connect to server");
+    return;
+  }
 
   messageInput.addEventListener("keypress", handleKeyPress);
   sendButton.addEventListener("click", sendMessage);

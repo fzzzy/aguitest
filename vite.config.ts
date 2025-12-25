@@ -10,7 +10,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/agent': 'http://127.0.0.1:8999'
+      '/agent': 'http://127.0.0.1:8999',
+      '/events': 'http://127.0.0.1:8999'
     }
   }
 })

@@ -1,10 +1,13 @@
 """AG-UI Agent Server using standard AG-UI protocol with agent.to_ag_ui()"""
 
+import asyncio
 import base64
 import os
 import re
 import time
-from fastapi import FastAPI
+import typing
+from uuid import uuid4
+from fastapi import FastAPI, Request, HTTPException
 from starlette.responses import StreamingResponse
 from pydantic_ai import Agent, DeferredToolResults
 from pydantic_ai.ag_ui import run_ag_ui, StateDeps
@@ -14,7 +17,6 @@ from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSetting
 from pydantic_ai.providers.bedrock import BedrockProvider
 from pydantic_ai import DeferredToolRequests
 from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent, UserMessage
-import uuid
 from ag_ui.core import CustomEvent
 from simpleeval import simple_eval
 import json
@@ -107,6 +109,26 @@ agent = Agent(
 
 app = FastAPI()
 
+# Global dictionary: token (str) -> asyncio.Queue
+event_queues: dict[str, asyncio.Queue] = {}
+
+
+async def ping_all_queues():
+    """Send a ping to all connected clients every minute."""
+    while True:
+        await asyncio.sleep(60)
+        ping_event = {"ping": True}
+        for queue in event_queues.values():
+            try:
+                queue.put_nowait(ping_event)
+            except asyncio.QueueFull:
+                pass
+
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(ping_all_queues())
+
 
 def process_text_attachment(base64_data: str, filename: str) -> TextInputContent:
     text_content = base64.b64decode(base64_data).decode("utf-8")
@@ -173,8 +195,39 @@ def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
     return attachments_info
 
 
+@app.post("/events")
+async def events(request: Request):
+    """SSE endpoint that creates a session and streams events."""
+    token = str(uuid4())
+    queue: asyncio.Queue = asyncio.Queue()
+    event_queues[token] = queue
+
+    agent_url = f"/agent?token={token}"
+
+    async def event_stream():
+        try:
+            # First event: JSON with agent URL
+            first_event = {"agent": agent_url}
+            yield f"data: {json.dumps(first_event)}\n\n"
+
+            # Loop forever reading from queue
+            while True:
+                event = await queue.get()
+                yield f"data: {json.dumps(event)}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            event_queues.pop(token, None)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @app.post("/agent")
-async def agent_run(run_input: RunAgentInput):
+async def agent_run(request: Request, run_input: RunAgentInput, token: str):
+    # Validate token exists in global dictionary
+    if token not in event_queues:
+        raise HTTPException(status_code=404, detail="Invalid or expired token")
+
     deferred_tool_requests = {}
     deps = StateDeps(Dependencies())
 

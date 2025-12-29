@@ -2,11 +2,19 @@
 
 import asyncio
 import base64
+import logging
 import os
 import re
 import time
 import typing
 from uuid import uuid4
+
+logger = logging.getLogger("agent_server")
+logger.setLevel(logging.DEBUG)
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(_handler)
+
 from fastapi import FastAPI, Request, HTTPException
 from starlette.responses import StreamingResponse
 from pydantic_ai import Agent, DeferredToolResults
@@ -218,6 +226,7 @@ async def events(request: Request):
     agent_url = f"/agent?token={token}"
 
     async def event_stream():
+        logger.info(f"[{token[:8]}] /events client connected")
         try:
             # First event: JSON with agent URL
             first_event = {"agent": agent_url}
@@ -228,7 +237,7 @@ async def events(request: Request):
                 event = await session.queue.get()
                 yield f"data: {json.dumps(event)}\n\n"
         except asyncio.CancelledError:
-            pass
+            logger.info(f"[{token[:8]}] /events client disconnected")
         finally:
             # Cancel any running task before cleanup
             if session.current_task and not session.current_task.done():
@@ -236,6 +245,77 @@ async def events(request: Request):
             sessions.pop(token, None)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+async def stream_agent_response(
+    token: str,
+    run_input: RunAgentInput,
+    agent: Agent,
+    deps: StateDeps,
+    on_complete_callback,
+    deferred_tool_requests: dict,
+    state: dict,
+):
+    """Stream agent response, yielding SSE chunks."""
+    deferred_tool_results = None
+    attachments_info: dict[str, str] = {}
+
+    if run_input.state:
+        # Only create DeferredToolResults if there are actual approvals
+        approvals = run_input.state.get("deferred_tool_approvals", {})
+        if approvals:
+            deferred_tool_results = DeferredToolResults(approvals=approvals)
+
+        attachments_info = process_attachments(run_input)
+
+    state["ag_ui_events"] = run_ag_ui(
+        agent,
+        run_input,
+        deferred_tool_results=deferred_tool_results,
+        on_complete=on_complete_callback,
+        deps=deps
+    )
+
+    first_event_seen = False
+    async for chunk in state["ag_ui_events"]:
+        # Yield the first event (RUN_STARTED)
+        if not first_event_seen:
+            logger.debug(f"[{token[:8]}] RUN_STARTED event received")
+            yield chunk
+            first_event_seen = True
+
+            # After first event, yield instructions event (only on first turn)
+            if len(run_input.messages) == 1:
+                instructions_event = CustomEvent(
+                    name="instructions",
+                    value=AGENT_INSTRUCTIONS,
+                    timestamp=int(time.time() * 1000)
+                )
+                yield f"data: {json.dumps(instructions_event.model_dump())}\n\n"
+
+            # Emit attachments event if there are any
+            if attachments_info:
+                attachments_event = CustomEvent(
+                    name="attachments",
+                    value=attachments_info,
+                    timestamp=int(time.time() * 1000)
+                )
+                yield f"data: {json.dumps(attachments_event.model_dump())}\n\n"
+
+            continue
+        if chunk.startswith("data: "):
+            json_str = chunk[6:].strip()
+            event_data = json.loads(json_str)
+            if event_data.get("type") == "RUN_FINISHED":
+                logger.debug(f"[{token[:8]}] RUN_FINISHED event received")
+                deferred_event = CustomEvent(
+                    name="deferred_tool_requests",
+                    value=deferred_tool_requests,
+                    timestamp=int(time.time() * 1000)
+                )
+                yield f"data: {json.dumps(deferred_event.model_dump())}\n\n"
+
+        yield chunk
 
 
 @app.post("/agent")
@@ -258,8 +338,6 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
 
     def on_complete_callback(result):
         """Callback to capture deferred tool requests when the run completes."""
-        nonlocal deferred_tool_requests
-
         if isinstance(result.output, DeferredToolRequests):
             # Extract tool call information from the last model response
             response = result.response
@@ -270,64 +348,25 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
                         "args": part.args
                     }
 
+    state = {}
+
     async def event_stream():
-        deferred_tool_results = None
-        attachments_info: dict[str, str] = {}
-
-        if run_input.state:
-            # Only create DeferredToolResults if there are actual approvals
-            approvals = run_input.state.get("deferred_tool_approvals", {})
-            if approvals:
-                deferred_tool_results = DeferredToolResults(approvals=approvals)
-
-            attachments_info = process_attachments(run_input)
-
-        ag_ui_events = run_ag_ui(
-            session.agent,
-            run_input,
-            deferred_tool_results=deferred_tool_results,
-            on_complete=on_complete_callback,
-            deps=deps
-        )
-
-        first_event_seen = False
-        async for chunk in ag_ui_events:
-            # Yield the first event (RUN_STARTED)
-            if not first_event_seen:
+        try:
+            async for chunk in stream_agent_response(
+                token, run_input, session.agent, deps,
+                on_complete_callback, deferred_tool_requests, state
+            ):
                 yield chunk
-                first_event_seen = True
-
-                # After first event, yield instructions event (only on first turn)
-                if len(run_input.messages) == 1:
-                    instructions_event = CustomEvent(
-                        name="instructions",
-                        value=AGENT_INSTRUCTIONS,
-                        timestamp=int(time.time() * 1000)
-                    )
-                    yield f"data: {json.dumps(instructions_event.model_dump())}\n\n"
-
-                # Emit attachments event if there are any
-                if attachments_info:
-                    attachments_event = CustomEvent(
-                        name="attachments",
-                        value=attachments_info,
-                        timestamp=int(time.time() * 1000)
-                    )
-                    yield f"data: {json.dumps(attachments_event.model_dump())}\n\n"
-
-                continue
-            if chunk.startswith("data: "):
-                json_str = chunk[6:].strip()
-                event_data = json.loads(json_str)
-                if event_data.get("type") == "RUN_FINISHED":
-                    deferred_event = CustomEvent(
-                        name="deferred_tool_requests",
-                        value=deferred_tool_requests,
-                        timestamp=int(time.time() * 1000)
-                    )
-                    yield f"data: {json.dumps(deferred_event.model_dump())}\n\n"
-
-            yield chunk
+        except asyncio.CancelledError:
+            logger.info(f"[{token[:8]}] /agent client disconnected")
+            raise
+        finally:
+            # Close the underlying LLM stream to stop wasting API credits
+            # NOTE: run_ag_ui has a bug where it doesn't handle GeneratorExit cleanly,
+            # causing "RuntimeError: async generator ignored GeneratorExit" in a background task.
+            # TODO: Report bug / patch pydantic_ai
+            if state.get("ag_ui_events") is not None:
+                await state["ag_ui_events"].aclose()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -341,9 +380,6 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExportResult
 
 from pydantic_ai import InstrumentationSettings
-
-
-import logging
 
 
 class CustomConsoleSpanExporter(ConsoleSpanExporter):

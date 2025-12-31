@@ -8,7 +8,7 @@ all: python/aguitest-venv node_modules
 	@echo "Starting Vite dev server and Python server..."
 	@(npm run dev &) && \
 	(sleep 2 && open http://localhost:5173/) & \
-	cd python && uv run uvicorn agent_server:app --host 127.0.0.1 --port 8999 --reload
+	cd python && uv run uvicorn agent_server:app --host 0.0.0.0 --port 8999 --reload
 
 # Build TypeScript frontend
 dist: node_modules src/index.ts

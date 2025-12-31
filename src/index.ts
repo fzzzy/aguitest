@@ -1,11 +1,27 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
+import { v4 as uuidv4 } from "uuid";
 import { registerComponents } from "./sfc";
 import { initSpeechRecognition } from "./speech";
 import type { ToolCall, SendButton, MessageInput } from "./components/elements";
 
+const DEBUG = false;
 
 registerComponents('./components/*.sfc.html');
+
+function debugLog(message: string): void {
+  if (!DEBUG) return;
+  const messagesDiv = document.getElementById("messages");
+  if (!messagesDiv) {
+    console.log("[DEBUG]", message);
+    return;
+  }
+  const spacer = document.getElementById("scroll-anchor")!;
+  const debugEl = document.createElement("debug-message");
+  debugEl.textContent = message;
+  messagesDiv.insertBefore(debugEl, spacer);
+  spacer.scrollIntoView({ behavior: "smooth" });
+}
 
 
 let messages: Message[] = [];
@@ -404,6 +420,8 @@ function showError(message: string): void {
 
 
 async function sendMessage(): Promise<void> {
+  debugLog("sendMessage() called");
+
   const input = document.getElementById("messageInput") as MessageInput;
   const sendButton = document.getElementById("sendButton") as SendButton;
   const messageText = input.value.trim();
@@ -417,7 +435,7 @@ async function sendMessage(): Promise<void> {
 
   addMessage("user", messageText);
   messages.push({
-    id: crypto.randomUUID(),
+    id: uuidv4(),
     role: "user",
     content: messageText,
   });
@@ -431,7 +449,9 @@ async function sendMessage(): Promise<void> {
   } catch (error: any) {
     console.error("[Client] Error in sendMessage:", error);
     removeTypingIndicator();
-    showError(error.message || "Failed to send message");
+    const errorMsg = error?.message || String(error) || "Unknown error";
+    const errorStack = error?.stack ? `\n${error.stack}` : "";
+    showError(`sendMessage error: ${errorMsg}${errorStack}`);
     isProcessing = false;
     sendButton.disabled = false;
     input.focus();
@@ -441,6 +461,7 @@ async function sendMessage(): Promise<void> {
 
 function handleKeyPress(event: KeyboardEvent): void {
   if (event.key === "Enter" && !event.shiftKey) {
+    debugLog("Enter key pressed");
     event.preventDefault();
     sendMessage();
   }
@@ -518,8 +539,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const agentUrl = await connectToEvents();
     console.log("[Client] Connected to events, agent URL:", agentUrl);
 
+    // Debug: show full agent URL in the chat
+    const fullAgentUrl = new URL(agentUrl, window.location.origin).href;
+    debugLog(`Agent URL: ${agentUrl}\nFull URL: ${fullAgentUrl}\nwindow.location: ${window.location.href}`);
+
     agent = new HttpAgent({
-      url: agentUrl,
+      url: fullAgentUrl,
     });
   } catch (error) {
     console.error("[Client] Failed to connect to events:", error);
@@ -541,4 +566,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Expose test function to console for debugging
   (window as any).testError = () => showError("This is a test error message");
+
+  // Global error handlers to show errors in the UI
+  window.onerror = (message, source, lineno, colno, error) => {
+    showError(`Global error: ${message}\nSource: ${source}:${lineno}:${colno}\n${error?.stack || ''}`);
+    return false;
+  };
+
+  window.onunhandledrejection = (event) => {
+    const error = event.reason;
+    const errorMsg = error?.message || String(error) || "Unknown promise rejection";
+    const errorStack = error?.stack || "";
+    showError(`Unhandled rejection: ${errorMsg}\n${errorStack}`);
+  };
 });

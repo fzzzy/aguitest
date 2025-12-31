@@ -230,6 +230,7 @@ async def events(request: Request):
         try:
             # First event: JSON with agent URL
             first_event = {"agent": agent_url}
+            print(f"[DEBUG] Sending first_event: {first_event}")
             yield f"data: {json.dumps(first_event)}\n\n"
 
             # Loop forever reading from queue

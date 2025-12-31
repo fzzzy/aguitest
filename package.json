@@ -14,6 +14,7 @@
   "devDependencies": {
     "@eslint/js": "^9.38.0",
     "@types/node": "^22.8.6",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
     "eslint": "^9.38.0",
@@ -24,6 +25,7 @@
   },
   "dependencies": {
     "@ag-ui/client": "^0.0.40",
-    "@ag-ui/core": "^0.0.39"
+    "@ag-ui/core": "^0.0.39",
+    "uuid": "^13.0.0"
   }
 }

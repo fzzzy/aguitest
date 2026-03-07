@@ -39,7 +39,6 @@ async function connectToEvents(): Promise<string> {
   }
 
   const reader = response.body!.getReader();
-  eventsReader = reader;
   const decoder = new TextDecoder();
 
   // Read the first event to get the agent URL

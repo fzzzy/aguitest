@@ -24,14 +24,12 @@ function debugLog(message: string): void {
 }
 
 
-let messages: Message[] = [];
+const messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
-let currentToolCall: ToolCall | null = null;
-let toolCallsMap: Record<string, ToolCall> = {};
+const toolCallsMap: Record<string, ToolCall> = {};
 let isProcessing = false;
 
 let agent: HttpAgent;
-let eventsReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
 
 async function connectToEvents(): Promise<string> {

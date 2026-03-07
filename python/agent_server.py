@@ -2,33 +2,34 @@
 
 import asyncio
 import base64
+import json
 import logging
-import os
 import re
+import signal
 import time
 import typing
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from types import FrameType
 from uuid import uuid4
+
+from ag_ui.core import CustomEvent
+from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
+from pydantic_ai.ag_ui import run_ag_ui, StateDeps
+from pydantic_ai.messages import ToolCallPart
+from pydantic_ai.toolsets import FunctionToolset
+from simpleeval import simple_eval
+from starlette.responses import StreamingResponse
 
 logger = logging.getLogger("agent_server")
 logger.setLevel(logging.DEBUG)
 _handler = logging.StreamHandler()
 _handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(_handler)
-
-from fastapi import FastAPI, Request, HTTPException
-from starlette.responses import StreamingResponse
-from pydantic_ai import Agent, DeferredToolResults
-from pydantic_ai.ag_ui import run_ag_ui, StateDeps
-from pydantic_ai.toolsets import FunctionToolset
-from pydantic_ai.messages import ToolCallPart
-from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
-from pydantic_ai.providers.bedrock import BedrockProvider
-from pydantic_ai import DeferredToolRequests
-from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent, UserMessage
-from ag_ui.core import CustomEvent
-from simpleeval import simple_eval
-import json
-from dataclasses import dataclass
 
 
 DEBUG = False
@@ -47,17 +48,16 @@ def parse_data_url(data_url: str) -> tuple[str, str] | None:
     return media_type, base64_data
 
 
-@dataclass
-class Dependencies:
+class Dependencies(BaseModel):
     pass
 
 
 @dataclass
 class Session:
     """Holds state for each connected client session."""
-    agent: Agent
-    queue: asyncio.Queue
-    current_task: asyncio.Task | None = None
+    agent: Agent[typing.Any]
+    queue: asyncio.Queue[typing.Any]
+    current_task: asyncio.Task[typing.Any] | None = None
 
 
 toolset = FunctionToolset()
@@ -114,18 +114,18 @@ toolset.add_function(
 #    deps_type=StateDeps[Dependencies],
 #)
 
-def create_agent() -> Agent:
+def create_agent() -> Agent[StateDeps[Dependencies]]:
     """Create a new agent instance for a session."""
     return Agent(
         "openai-responses:gpt-5.2",
         system_prompt=AGENT_INSTRUCTIONS,
-        toolsets=[toolset],
+        toolsets=[toolset],  # type: ignore[list-item]
         output_type=[DeferredToolRequests, str],
         deps_type=StateDeps[Dependencies],
     )
 
 
-app = FastAPI()
+SignalHandler = Callable[[int, FrameType | None], object] | int | None
 
 # Global dictionary: token (str) -> Session
 sessions: dict[str, Session] = {}
@@ -143,9 +143,33 @@ async def ping_all_sessions():
                 pass
 
 
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(ping_all_sessions())
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Install signal handlers to gracefully close SSE before uvicorn shuts down
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        prev: SignalHandler = signal.getsignal(sig)
+
+        def make_handler(
+            s: signal.Signals, previous: SignalHandler
+        ) -> Callable[[], None]:
+            def handler() -> None:
+                for session in sessions.values():
+                    session.queue.put_nowait({"die": True})
+                if callable(previous):
+                    previous(s, None)
+
+            return handler
+
+        loop.add_signal_handler(sig, make_handler(sig, prev))
+
+    # Start ping task
+    ping_task = asyncio.create_task(ping_all_sessions())
+    yield
+    ping_task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def process_text_attachment(base64_data: str, filename: str) -> TextInputContent:
@@ -161,7 +185,7 @@ def process_binary_attachment(
     media_type: str, base64_data: str, filename: str
 ) -> BinaryInputContent:
     return BinaryInputContent(
-        mimeType=media_type,
+        mime_type=media_type,
         data=base64_data,
         filename=filename
     )
@@ -169,9 +193,9 @@ def process_binary_attachment(
 
 def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
     attachments = run_input.state.get("attachments", {})
-    attachments_info = {}
+    attachments_info: dict[str, str] = {}
     if not (attachments and run_input.messages):
-        return
+        return attachments_info
     # Find the last user message index
     last_user_idx = -1
     for i in range(len(run_input.messages) - 1, -1, -1):
@@ -179,12 +203,11 @@ def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
             last_user_idx = i
             break
 
-    if not (last_user_idx >= 0):
-        return [], []
+    if last_user_idx < 0:
+        return attachments_info
 
     msg = run_input.messages[last_user_idx]
-    content_list = None
-    text_attachment_messages = []
+    content_list: list[TextInputContent | BinaryInputContent] | None = None
 
     for filename, data_url in attachments.items():
         parsed = parse_data_url(data_url)
@@ -196,19 +219,20 @@ def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
         if content_list is None:
             if isinstance(msg.content, str):
                 content_list = [TextInputContent(text=msg.content)]
+            elif isinstance(msg.content, list):
+                content_list = list(msg.content)  # type: ignore[arg-type]
             else:
-                content_list = list(msg.content)
+                content_list = []
 
         if media_type.startswith("text/"):
-            message = process_text_attachment(base64_data, filename)
-            content_list.append(message)
+            content_list.append(process_text_attachment(base64_data, filename))
         else:
             content_list.append(
                 process_binary_attachment(media_type, base64_data, filename)
             )
 
     if content_list:
-        msg.content = content_list
+        msg.content = content_list  # type: ignore[assignment]
 
     return attachments_info
 
@@ -236,6 +260,9 @@ async def events(request: Request):
             # Loop forever reading from queue
             while True:
                 event = await session.queue.get()
+                if isinstance(event, dict) and event.get("die"):
+                    yield "event: die\ndata: shutdown\n\n"
+                    return
                 yield f"data: {json.dumps(event)}\n\n"
         except asyncio.CancelledError:
             logger.info(f"[{token[:8]}] /events client disconnected")
@@ -269,7 +296,7 @@ async def stream_agent_response(
 
         attachments_info = process_attachments(run_input)
 
-    state["ag_ui_events"] = run_ag_ui(
+    state["ag_ui_events"] = run_ag_ui(  # type: ignore[misc]
         agent,
         run_input,
         deferred_tool_results=deferred_tool_results,
@@ -334,7 +361,7 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
         except asyncio.CancelledError:
             pass
 
-    deferred_tool_requests = {}
+    deferred_tool_requests: dict[str, typing.Any] = {}
     deps = StateDeps(Dependencies())
 
     def on_complete_callback(result):
@@ -349,7 +376,7 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
                         "args": part.args
                     }
 
-    state = {}
+    state: dict[str, typing.Any] = {}
 
     async def event_stream():
         try:
@@ -372,28 +399,27 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+def instrument(service_name: str = "default") -> None:
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+    from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+    from opentelemetry.sdk.trace.export import (
+        BatchSpanProcessor,
+        ConsoleSpanExporter,
+        SpanExportResult,
+    )
 
+    from pydantic_ai import InstrumentationSettings
 
-from opentelemetry import trace
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+    class CustomConsoleSpanExporter(ConsoleSpanExporter):
+        def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
+            for span in spans:
+                formatted_span = self.formatter(span)
+                span_dict = json.loads(formatted_span)
+                name = span_dict.get("name", "")
+                print(name, span_dict)
+            return SpanExportResult.SUCCESS
 
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExportResult
-
-from pydantic_ai import InstrumentationSettings
-
-
-class CustomConsoleSpanExporter(ConsoleSpanExporter):
-    def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
-        for span in spans:
-            formatted_span = self.formatter(span)
-            span_dict = json.loads(formatted_span)
-            name = span_dict.get("name", "")
-            print(name, span_dict)
-        return SpanExportResult.SUCCESS
-
-
-def instrument(service_name="default"):
     resource = Resource.create(attributes={SERVICE_NAME: service_name})
 
     provider = TracerProvider(resource=resource)
@@ -401,14 +427,9 @@ def instrument(service_name="default"):
 
     print("Enabling local LLM prompt logging to console")
     provider.add_span_processor(BatchSpanProcessor(CustomConsoleSpanExporter()))
-    # Override the OTEL_SDK_DISABLED but only if we are logging prompts locally
-    provider._disabled = False
+    provider._disabled = False  # type: ignore[attr-defined]
 
     Agent.instrument_all(InstrumentationSettings(version=3))
-
-#    logging.basicConfig(level=logging.DEBUG)
-#    logging.getLogger('boto3').setLevel(logging.DEBUG)
-#    logging.getLogger('botocore').setLevel(logging.DEBUG)
 
 
 if DEBUG:

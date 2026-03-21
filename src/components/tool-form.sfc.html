@@ -1,0 +1,152 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      animation: fadeIn 0.3s ease-in;
+    }
+    .wrapper {
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+    }
+    .title {
+      font-weight: 600;
+      color: #2e7d32;
+      margin-bottom: 8px;
+    }
+    .field {
+      margin-bottom: 8px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 2px;
+    }
+    .field input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: monospace;
+      box-sizing: border-box;
+    }
+    .field input:focus {
+      outline: none;
+      border-color: #4caf50;
+    }
+    .submit-btn {
+      background: #4caf50;
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .submit-btn:hover {
+      background: #388e3c;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <div class="wrapper">
+    <div class="title"></div>
+    <div class="fields"></div>
+  </div>
+</template>
+<script>
+interface A2UIComponent {
+  id: string;
+  component: Record<string, any>;
+}
+
+interface A2UIMessage {
+  surfaceUpdate?: {
+    surfaceId: string;
+    components: A2UIComponent[];
+  };
+  beginRendering?: {
+    surfaceId: string;
+    root: string;
+  };
+}
+
+export default class extends HTMLElement {
+  private inputs: Map<string, HTMLInputElement> = new Map();
+  private toolName: string = '';
+  private actionName: string = '';
+
+  connectedCallback() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot!.appendChild(template.content.cloneNode(true));
+  }
+
+  setA2UI(toolName: string, messages: A2UIMessage[]) {
+    this.toolName = toolName;
+    this.shadowRoot!.querySelector('.title')!.textContent = `⎚ ${toolName}`;
+
+    const surfaceUpdate = messages.find(m => m.surfaceUpdate);
+    if (!surfaceUpdate?.surfaceUpdate) return;
+
+    const components = surfaceUpdate.surfaceUpdate.components;
+    const fieldsEl = this.shadowRoot!.querySelector('.fields')!;
+
+    for (const comp of components) {
+      const type = Object.keys(comp.component)[0];
+      const props = comp.component[type];
+
+      if (type === 'TextField') {
+        const field = document.createElement('div');
+        field.className = 'field';
+        const label = document.createElement('label');
+        label.textContent = props.label?.literalString || props.dataModelKey || comp.id;
+        const input = document.createElement('input');
+        input.type = props.inputType === 'number' ? 'number' : 'text';
+        input.placeholder = label.textContent;
+        input.addEventListener('keypress', (e: KeyboardEvent) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.handleSubmit();
+          }
+        });
+        field.appendChild(label);
+        field.appendChild(input);
+        fieldsEl.appendChild(field);
+        this.inputs.set(props.dataModelKey || comp.id, input);
+      } else if (type === 'Button') {
+        const btn = document.createElement('button');
+        btn.className = 'submit-btn';
+        btn.textContent = props.label?.literalString || 'Submit';
+        this.actionName = props.action?.name || '';
+        btn.addEventListener('click', () => this.handleSubmit());
+        fieldsEl.appendChild(btn);
+      }
+    }
+
+    // Focus the first input
+    const firstInput = this.inputs.values().next().value;
+    if (firstInput) {
+      setTimeout(() => firstInput.focus(), 0);
+    }
+  }
+
+  private handleSubmit() {
+    const args: Record<string, string> = {};
+    for (const [key, input] of this.inputs) {
+      args[key] = input.value;
+    }
+    console.log('[ToolForm] Submit:', this.toolName, args, this.actionName);
+    this.dispatchEvent(new CustomEvent('tool-submit', {
+      detail: { toolName: this.toolName, args, action: this.actionName }
+    }));
+  }
+}
+</script>

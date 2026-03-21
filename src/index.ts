@@ -6,8 +6,12 @@ import { initSpeechRecognition } from "./speech";
 import type { ToolCall, SendButton, MessageInput } from "./components/elements";
 
 interface ToolToggles extends HTMLElement {
-  setTools(tools: { name: string; description: string }[]): void;
+  setTools(tools: { name: string; description: string; a2ui: any[] }[]): void;
   getDisabledTools(): string[];
+}
+
+interface ToolForm extends HTMLElement {
+  setA2UI(toolName: string, messages: any[]): void;
 }
 
 const DEBUG = false;
@@ -32,6 +36,7 @@ function debugLog(message: string): void {
 const messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
 const toolCallsMap: Record<string, ToolCall> = {};
+let currentToolCall: ToolCall | null = null;
 let isProcessing = false;
 
 let agent: HttpAgent;
@@ -557,6 +562,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!agent.state) agent.state = {};
         agent.state.disabled_tools = e.detail.disabledTools;
         console.log("[Client] Disabled tools:", e.detail.disabledTools);
+      }) as EventListener);
+      toolToggles.addEventListener("tool-invoke", ((e: CustomEvent) => {
+        const { name, a2ui } = e.detail;
+        const messagesDiv = document.getElementById("messages")!;
+        const spacer = document.getElementById("scroll-anchor")!;
+        const form = document.createElement("tool-form") as ToolForm;
+        messagesDiv.insertBefore(form, spacer);
+        form.setA2UI(name, a2ui);
+        form.addEventListener("tool-submit", (async (se: CustomEvent) => {
+          form.remove();
+          if (!agent.state) agent.state = {};
+          agent.state.manual_tool_call = { name: se.detail.toolName, args: se.detail.args };
+          addTypingIndicator();
+          try {
+            await agent.runAgent({}, createSubscriber({
+              logPrefix: " (manual tool)",
+              onFinished: () => {
+                delete agent.state!.manual_tool_call;
+              },
+            }));
+          } catch (error: any) {
+            removeTypingIndicator();
+            showError(error.message || "Failed to invoke tool");
+          }
+        }) as EventListener);
+        scrollToBottom();
       }) as EventListener);
     } else {
       toolToggles.style.display = "none";

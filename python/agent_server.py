@@ -20,8 +20,11 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
 from pydantic_ai.ag_ui import run_ag_ui, StateDeps
-from pydantic_ai.messages import ToolCallPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
+from pydantic_ai.models import ModelRequestParameters, ModelSettings
+from pydantic_ai.models.function import DeltaToolCall, FunctionModel, AgentInfo
 from pydantic_ai.toolsets import FunctionToolset
+from pydantic_ai.usage import Usage
 from simpleeval import simple_eval
 from starlette.responses import StreamingResponse
 
@@ -214,6 +217,44 @@ def create_agent() -> Agent[StateDeps[Dependencies]]:
         output_type=[DeferredToolRequests, str],
         deps_type=StateDeps[Dependencies],
     )
+
+
+def make_injector_stream_fn(
+    tool_name: str,
+    tool_args: str,
+    real_model: typing.Any,
+) -> typing.Callable[..., typing.AsyncIterator[str | dict[int, DeltaToolCall]]]:
+    """Create a stream function that injects a predetermined tool call on the first turn,
+    then delegates to the real model for the summary."""
+    call_count = 0
+
+    async def injector_stream_fn(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> typing.AsyncIterator[str | dict[int, DeltaToolCall]]:
+        nonlocal call_count
+        call_count += 1
+        # Inject a user turn so Gemini sees: user -> tool_call (not model -> tool_call)
+        user_msg = ModelRequest(parts=[UserPromptPart(
+            content=f"The user manually triggered the {tool_name} tool with args: {tool_args}"
+        )])
+        insert_idx = 1 if len(messages) > 0 else 0
+        messages.insert(insert_idx, user_msg)
+
+        if call_count == 1:
+            yield {0: DeltaToolCall(
+                name=tool_name,
+                json_args=tool_args,
+                tool_call_id=str(uuid4()),
+            )}
+        else:
+            response = await real_model.request(
+                messages, info.model_settings, info.model_request_parameters
+            )
+            for part in response.parts:
+                if hasattr(part, 'content'):
+                    yield part.content
+
+    return injector_stream_fn
 
 
 SignalHandler = Callable[[int, FrameType | None], object] | int | None
@@ -489,12 +530,40 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
                         "args": part.args
                     }
 
+    # Check for manual tool call — use FunctionModel to inject a predetermined tool call
+    manual_call = run_input.state.get("manual_tool_call") if run_input.state else None
+    if manual_call:
+        stream_fn = make_injector_stream_fn(
+            tool_name=manual_call["name"],
+            tool_args=json.dumps(manual_call["args"]),
+            real_model=session.agent.model,
+        )
+        injector_model = FunctionModel(stream_function=stream_fn, model_name="manual-tool-injector")
+        auto_approved_toolset = FunctionToolset()
+        for name, tool in toolset.tools.items():
+            auto_approved_toolset.add_function(
+                tool.function,
+                name=name,
+                description=tool.description,
+                requires_approval=False,
+            )
+        agent = Agent(
+            injector_model,
+            system_prompt=AGENT_INSTRUCTIONS + "\nThe user manually triggered a tool call. Briefly describe the result.",
+            toolsets=[auto_approved_toolset],  # type: ignore[list-item]
+            output_type=str,
+            deps_type=StateDeps[Dependencies],
+        )
+
+    if not manual_call:
+        agent = session.agent
+
     state: dict[str, typing.Any] = {}
 
     async def event_stream():
         try:
             async for chunk in stream_agent_response(
-                token, run_input, session.agent, deps,
+                token, run_input, agent, deps,
                 on_complete_callback, deferred_tool_requests, state
             ):
                 yield chunk

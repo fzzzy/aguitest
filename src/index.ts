@@ -5,6 +5,11 @@ import { registerComponents } from "./sfc";
 import { initSpeechRecognition } from "./speech";
 import type { ToolCall, SendButton, MessageInput } from "./components/elements";
 
+interface ToolToggles extends HTMLElement {
+  setTools(tools: { name: string; description: string }[]): void;
+  getDisabledTools(): string[];
+}
+
 const DEBUG = false;
 
 registerComponents('./components/*.sfc.html');
@@ -32,7 +37,7 @@ let isProcessing = false;
 let agent: HttpAgent;
 
 
-async function connectToEvents(): Promise<string> {
+async function connectToEvents(): Promise<{ agentUrl: string; availableTools: { name: string; description: string }[] }> {
   const response = await fetch("/events", { method: "POST" });
   if (!response.ok) {
     throw new Error(`Failed to connect to events: ${response.status}`);
@@ -56,7 +61,7 @@ async function connectToEvents(): Promise<string> {
         if (data.agent) {
           // Start listening for pings in background
           listenForPings(reader, decoder, buffer.slice(buffer.indexOf("\n\n") + 2));
-          return data.agent;
+          return { agentUrl: data.agent, availableTools: data.available_tools || [] };
         }
       }
     }
@@ -533,7 +538,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Connect to events endpoint first to get agent URL
   try {
-    const agentUrl = await connectToEvents();
+    const { agentUrl, availableTools } = await connectToEvents();
     console.log("[Client] Connected to events, agent URL:", agentUrl);
 
     // Debug: show full agent URL in the chat
@@ -543,9 +548,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     agent = new HttpAgent({
       url: fullAgentUrl,
     });
-  } catch (error) {
+
+    // Set up tool toggles
+    const toolToggles = document.getElementById("toolToggles") as ToolToggles;
+    if (availableTools.length > 0) {
+      toolToggles.setTools(availableTools);
+      toolToggles.addEventListener("tools-changed", ((e: CustomEvent) => {
+        if (!agent.state) agent.state = {};
+        agent.state.disabled_tools = e.detail.disabledTools;
+        console.log("[Client] Disabled tools:", e.detail.disabledTools);
+      }) as EventListener);
+    } else {
+      toolToggles.style.display = "none";
+    }
+  } catch (error: any) {
     console.error("[Client] Failed to connect to events:", error);
-    showError("Failed to connect to server");
+    showError(`Failed to connect to server: ${error?.message || error}`);
     return;
   }
 

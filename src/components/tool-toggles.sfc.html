@@ -1,0 +1,97 @@
+<template>
+  <style>
+    .tool-toggles {
+      padding: 2px 4px;
+      font-size: 13px;
+    }
+    .header {
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 2px;
+    }
+    .tools-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      color: #333;
+    }
+    input[type="checkbox"] {
+      accent-color: #4ecdc4;
+    }
+    .tool-name {
+      font-family: monospace;
+    }
+  </style>
+  <div class="tool-toggles">
+    <div class="header">Tools</div>
+    <div class="tools-list"></div>
+  </div>
+</template>
+<script>
+interface ToolInfo {
+  name: string;
+  description: string;
+}
+
+export default class extends HTMLElement {
+  private tools: ToolInfo[] = [];
+  private disabledTools: Set<string> = new Set();
+  private ready = false;
+
+  connectedCallback() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot!.appendChild(template.content.cloneNode(true));
+    this.ready = true;
+    if (this.tools.length > 0) {
+      this.render();
+    }
+  }
+
+  setTools(tools: ToolInfo[]) {
+    this.tools = tools;
+    if (this.ready) {
+      this.render();
+    }
+  }
+
+  getDisabledTools(): string[] {
+    return [...this.disabledTools];
+  }
+
+  private render() {
+    const list = this.shadowRoot!.querySelector('.tools-list')!;
+    list.innerHTML = '';
+    for (const tool of this.tools) {
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = !this.disabledTools.has(tool.name);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          this.disabledTools.delete(tool.name);
+        } else {
+          this.disabledTools.add(tool.name);
+        }
+        this.dispatchEvent(new CustomEvent('tools-changed', {
+          detail: { disabledTools: this.getDisabledTools() }
+        }));
+      });
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'tool-name';
+      nameSpan.textContent = tool.name;
+      label.appendChild(checkbox);
+      label.appendChild(nameSpan);
+      if (tool.description) {
+        label.title = tool.description;
+      }
+      list.appendChild(label);
+    }
+  }
+}
+</script>

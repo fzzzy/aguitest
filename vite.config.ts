@@ -19,6 +19,9 @@ const localIP = getLocalIP()
 export default defineConfig({
   plugins: [sfcPlugin()],
   root: 'src',
+  define: {
+    'process.env': {},
+  },
   build: {
     outDir: '../dist',
     emptyOutDir: true,

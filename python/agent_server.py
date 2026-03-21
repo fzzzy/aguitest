@@ -248,12 +248,16 @@ async def events(request: Request):
     sessions[token] = session
 
     agent_url = f"/agent?token={token}"
+    available_tools = [
+        {"name": name, "description": tool.description or ""}
+        for name, tool in toolset.tools.items()
+    ]
 
     async def event_stream():
         logger.info(f"[{token[:8]}] /events client connected")
         try:
-            # First event: JSON with agent URL
-            first_event = {"agent": agent_url}
+            # First event: JSON with agent URL and available tools
+            first_event = {"agent": agent_url, "available_tools": available_tools}
             print(f"[DEBUG] Sending first_event: {first_event}")
             yield f"data: {json.dumps(first_event)}\n\n"
 
@@ -295,6 +299,20 @@ async def stream_agent_response(
             deferred_tool_results = DeferredToolResults(approvals=approvals)
 
         attachments_info = process_attachments(run_input)
+
+    # Filter tools based on disabled_tools in state
+    disabled_tools = set(run_input.state.get("disabled_tools", [])) if run_input.state else set()
+    if disabled_tools:
+        filtered = toolset.filtered(
+            lambda _ctx, tool_def: tool_def.name not in disabled_tools
+        )
+        agent = Agent(
+            agent.model,
+            system_prompt=AGENT_INSTRUCTIONS,
+            toolsets=[filtered],  # type: ignore[list-item]
+            output_type=[DeferredToolRequests, str],
+            deps_type=StateDeps[Dependencies],
+        )
 
     state["ag_ui_events"] = run_ag_ui(  # type: ignore[misc]
         agent,

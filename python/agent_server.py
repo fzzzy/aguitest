@@ -25,6 +25,8 @@ from pydantic_ai.models import ModelRequestParameters, ModelSettings
 from pydantic_ai.models.function import DeltaToolCall, FunctionModel, AgentInfo
 from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import Usage
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
 from simpleeval import simple_eval
 from starlette.responses import StreamingResponse
 
@@ -185,6 +187,68 @@ toolset.add_function(
 )
 
 
+# --- Meme generator tool ---
+
+IMPACT_FONT = "/System/Library/Fonts/Supplemental/Impact.ttf"
+MEME_DIR = Path(__file__).parent / "generated_memes"
+MEME_DIR.mkdir(exist_ok=True)
+
+# Store generated meme filenames for serving
+generated_memes: dict[str, Path] = {}
+
+
+def _draw_meme_text(draw: ImageDraw.ImageDraw, text: str, y: int, width: int, font: ImageFont.FreeTypeFont) -> None:
+    """Draw Impact-style text (white with black outline) centered at y."""
+    text = text.upper()
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    x = (width - text_width) // 2
+    # Black outline
+    for dx in range(-3, 4):
+        for dy in range(-3, 4):
+            draw.text((x + dx, y + dy), text, font=font, fill="black")
+    # White text
+    draw.text((x, y), text, font=font, fill="white")
+
+
+DOGE_TEMPLATE = Path(__file__).parent / "meme_templates" / "doge.jpg"
+
+
+def make_meme(top_text: str, bottom_text: str) -> str:
+    """Generate a doge meme image with Impact font.
+
+    Creates a classic doge meme with white-on-black outlined text in Impact font.
+
+    Args:
+        top_text: Text for the top of the meme (will be uppercased)
+        bottom_text: Text for the bottom of the meme (will be uppercased)
+
+    Returns a URL to the generated image.
+    """
+    img = Image.open(DOGE_TEMPLATE).copy()
+    width, height = img.size
+    draw = ImageDraw.Draw(img)
+
+    font = ImageFont.truetype(IMPACT_FONT, width // 12)
+
+    _draw_meme_text(draw, top_text, 20, width, font)
+    _draw_meme_text(draw, bottom_text, height - 80, width, font)
+
+    meme_id = str(uuid4())[:8]
+    filename = f"meme_{meme_id}.png"
+    filepath = MEME_DIR / filename
+    img.save(filepath)
+    generated_memes[meme_id] = filepath
+
+    return json.dumps({"url": f"/memes/{meme_id}", "meme_id": meme_id})
+
+
+toolset.add_function(
+    make_meme,
+    requires_approval=False,
+)
+
+
 #model = BedrockConverseModel(
 #    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 #    provider=BedrockProvider(
@@ -302,6 +366,15 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/memes/{meme_id}")
+async def serve_meme(meme_id: str):
+    filepath = generated_memes.get(meme_id)
+    if not filepath or not filepath.exists():
+        raise HTTPException(status_code=404, detail="Meme not found")
+    from starlette.responses import FileResponse
+    return FileResponse(filepath, media_type="image/png")
 
 
 def process_text_attachment(base64_data: str, filename: str) -> TextInputContent:

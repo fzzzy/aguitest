@@ -25,6 +25,7 @@ python/uv.lock
 
 # Project directories
 var/
+python/generated_memes/
 
 # macOS system files
 .DS_Store

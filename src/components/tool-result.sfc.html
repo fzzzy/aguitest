@@ -24,6 +24,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .content img {
+      max-width: 100%;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -40,7 +45,18 @@ export default class extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.shadowRoot!.appendChild(template.content.cloneNode(true));
     const content = this.getAttribute("content") || "";
-    this.shadowRoot!.querySelector(".content")!.textContent = content;
+    const contentEl = this.shadowRoot!.querySelector(".content")!;
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.url) {
+        const img = document.createElement("img");
+        img.src = parsed.url;
+        img.alt = "Tool result image";
+        contentEl.appendChild(img);
+        return;
+      }
+    } catch {}
+    contentEl.textContent = content;
   }
 }
 </script>

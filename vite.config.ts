@@ -41,6 +41,9 @@ export default defineConfig({
           });
         }
       },
+      '/memes': {
+        target: `http://${localIP}:8999`,
+      },
       '/events': {
         target: `http://${localIP}:8999`,
         configure: (proxy) => {

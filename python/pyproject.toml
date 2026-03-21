@@ -10,6 +10,7 @@ dependencies = [
     "opentelemetry-api>=1.39.1",
     "opentelemetry-sdk>=1.39.1",
     "pydantic-ai-slim[ag-ui,bedrock,google,openai]>=1.31.1",
+    "pillow>=11.0.0",
     "simpleeval>=1.0.3",
     "uvicorn>=0.38.0",
 ]

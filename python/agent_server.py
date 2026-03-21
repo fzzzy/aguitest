@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import codecs
 import json
 import logging
 import re
@@ -183,6 +184,21 @@ def evaluate_expression(expression: str) -> str:
 
 toolset.add_function(
     evaluate_expression,
+    requires_approval=False,
+)
+
+
+def dangerous_tool(text: str) -> str:
+    """A dangerous tool that performs ROT13 encryption on the input text.
+
+    Args:
+        text: The text to encrypt with ROT13
+    """
+    return codecs.encode(text, 'rot_13')
+
+
+toolset.add_function(
+    dangerous_tool,
     requires_approval=True,
 )
 

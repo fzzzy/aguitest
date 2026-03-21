@@ -27,6 +27,21 @@
     .tool-name {
       font-family: monospace;
     }
+    .tool-invoke {
+      background: none;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 1px 4px;
+      font-size: 14px;
+      line-height: 1;
+      color: #666;
+    }
+    .tool-invoke:hover {
+      background: #e0f7fa;
+      border-color: #4ecdc4;
+      color: #333;
+    }
   </style>
   <div class="tool-toggles">
     <div class="header">Tools</div>
@@ -37,6 +52,7 @@
 interface ToolInfo {
   name: string;
   description: string;
+  a2ui: any[];
 }
 
 export default class extends HTMLElement {
@@ -90,7 +106,20 @@ export default class extends HTMLElement {
       if (tool.description) {
         label.title = tool.description;
       }
+      const invokeBtn = document.createElement('button');
+      invokeBtn.className = 'tool-invoke';
+      invokeBtn.textContent = '⎚';
+      invokeBtn.title = `Call ${tool.name}`;
+      invokeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('[ToolToggles] Invoke tool:', tool.name);
+        console.log('[ToolToggles] A2UI:', JSON.stringify(tool.a2ui, null, 2));
+        this.dispatchEvent(new CustomEvent('tool-invoke', {
+          detail: { name: tool.name, description: tool.description, a2ui: tool.a2ui }
+        }));
+      });
       list.appendChild(label);
+      list.appendChild(invokeBtn);
     }
   }
 }

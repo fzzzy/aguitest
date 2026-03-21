@@ -35,6 +35,95 @@ logger.addHandler(_handler)
 DEBUG = False
 
 
+def tool_schema_to_a2ui(tool_name: str, tool: typing.Any) -> list[dict[str, typing.Any]]:
+    """Convert a tool's JSON schema into A2UI messages for a form UI."""
+    schema = tool.function_schema.json_schema
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    children_ids: list[str] = []
+    components: list[dict[str, typing.Any]] = []
+
+    for prop_name, prop_schema in properties.items():
+        field_id = f"{tool_name}-{prop_name}"
+        prop_type = prop_schema.get("type", "string")
+
+        if prop_type == "boolean":
+            component = {
+                "id": field_id,
+                "component": {
+                    "Checkbox": {
+                        "label": {"literalString": prop_name},
+                        "dataModelKey": prop_name,
+                    }
+                },
+            }
+        elif prop_type == "number" or prop_type == "integer":
+            component = {
+                "id": field_id,
+                "component": {
+                    "TextField": {
+                        "label": {"literalString": prop_name},
+                        "inputType": "number",
+                        "dataModelKey": prop_name,
+                    }
+                },
+            }
+        else:
+            component = {
+                "id": field_id,
+                "component": {
+                    "TextField": {
+                        "label": {"literalString": prop_name},
+                        "dataModelKey": prop_name,
+                    }
+                },
+            }
+
+        children_ids.append(field_id)
+        components.append(component)
+
+    # Add submit button
+    submit_id = f"{tool_name}-submit"
+    children_ids.append(submit_id)
+    components.append({
+        "id": submit_id,
+        "component": {
+            "Button": {
+                "label": {"literalString": f"Run {tool_name}"},
+                "action": {"name": f"invoke_{tool_name}"},
+            }
+        },
+    })
+
+    # Wrap in a Column
+    root_id = f"{tool_name}-form"
+    components.insert(0, {
+        "id": root_id,
+        "component": {
+            "Column": {
+                "children": children_ids,
+            }
+        },
+    })
+
+    surface_update = {
+        "surfaceUpdate": {
+            "surfaceId": tool_name,
+            "components": components,
+        }
+    }
+
+    begin_rendering = {
+        "beginRendering": {
+            "surfaceId": tool_name,
+            "root": root_id,
+        }
+    }
+
+    return [surface_update, begin_rendering]
+
+
 AGENT_INSTRUCTIONS = "You are a helpful assistant. Be concise and friendly."
 
 
@@ -116,8 +205,10 @@ toolset.add_function(
 
 def create_agent() -> Agent[StateDeps[Dependencies]]:
     """Create a new agent instance for a session."""
+    model = "google-gla:gemini-3.1-pro-preview"
+    logger.info(f"Creating agent with model: {model}")
     return Agent(
-        "openai-responses:gpt-5.2",
+        model,
         system_prompt=AGENT_INSTRUCTIONS,
         toolsets=[toolset],  # type: ignore[list-item]
         output_type=[DeferredToolRequests, str],
@@ -249,7 +340,11 @@ async def events(request: Request):
 
     agent_url = f"/agent?token={token}"
     available_tools = [
-        {"name": name, "description": tool.description or ""}
+        {
+            "name": name,
+            "description": tool.description or "",
+            "a2ui": tool_schema_to_a2ui(name, tool),
+        }
         for name, tool in toolset.tools.items()
     ]
 

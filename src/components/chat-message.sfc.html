@@ -36,25 +36,138 @@
       background: linear-gradient(135deg, #7dd3c0 0%, #88c9d4 100%);
       color: white;
     }
+    :host([role="user"]) .content code {
+      background: rgba(255,255,255,0.2);
+    }
+    :host([role="user"]) .content pre {
+      background: rgba(255,255,255,0.15);
+    }
     :host([role="assistant"]) .content {
       background: #e8f5f1;
       color: #2d6a5c;
     }
+    :host([role="assistant"]) .content pre {
+      background: rgba(0,0,0,0.05);
+    }
+    /* Markdown styles */
+    .content {
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    .content p { margin: 0.6em 0; }
+    .content p:first-child { margin-top: 0; }
+    .content p:last-child { margin-bottom: 0; }
+    .content pre {
+      background: rgba(0,0,0,0.08);
+      padding: 10px 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.85em;
+      line-height: 1.5;
+      margin: 0.6em 0;
+    }
+    .content pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+    .content code {
+      background: rgba(0,0,0,0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+    }
+    .content ul, .content ol { margin: 0.5em 0; padding-left: 1.6em; }
+    .content li { margin: 0.3em 0; }
+    .content li > p { margin: 0.3em 0; }
+    .content blockquote {
+      border-left: 3px solid rgba(0,0,0,0.25);
+      margin: 0.6em 0;
+      padding: 2px 0 2px 14px;
+      color: rgba(0,0,0,0.55);
+      font-style: italic;
+    }
+    .content h1, .content h2, .content h3, .content h4 {
+      margin: 0.8em 0 0.3em;
+      line-height: 1.3;
+    }
+    .content h1 { font-size: 1.3em; }
+    .content h2 { font-size: 1.15em; }
+    .content h3 { font-size: 1.05em; }
+    .content h1:first-child, .content h2:first-child, .content h3:first-child {
+      margin-top: 0;
+    }
+    .content table {
+      border-collapse: collapse;
+      margin: 0.6em 0;
+      font-size: 0.9em;
+      width: 100%;
+    }
+    .content th, .content td {
+      border: 1px solid rgba(0,0,0,0.15);
+      padding: 6px 12px;
+      text-align: left;
+    }
+    .content th {
+      background: rgba(0,0,0,0.06);
+      font-weight: 600;
+    }
+    .content tr:nth-child(even) {
+      background: rgba(0,0,0,0.02);
+    }
+    .content hr {
+      border: none;
+      border-top: 1px solid rgba(0,0,0,0.15);
+      margin: 0.8em 0;
+    }
+    .content a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .content strong { font-weight: 600; }
+    .content em { font-style: italic; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
   </style>
   <div class="avatar"></div>
-  <div class="content"><slot></slot></div>
+  <div class="content"></div>
 </template>
 <script>
 export default class extends HTMLElement {
-  connectedCallback() {
+  constructor() {
+    super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot!.appendChild(template.content.cloneNode(true));
+  }
+
+  connectedCallback() {
     const avatar = this.shadowRoot!.querySelector(".avatar")!;
     avatar.textContent = this.getAttribute("role") === "user" ? "U" : "A";
+  }
+
+  get contentEl(): HTMLElement {
+    return this.shadowRoot!.querySelector(".content")!;
+  }
+
+  get innerHTML(): string {
+    return this.contentEl.innerHTML;
+  }
+
+  set innerHTML(html: string) {
+    this.contentEl.innerHTML = html;
+  }
+
+  get textContent(): string | null {
+    return this.contentEl.textContent;
+  }
+
+  set textContent(text: string | null) {
+    this.contentEl.textContent = text;
   }
 }
 </script>

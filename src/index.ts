@@ -1,5 +1,6 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
+import { marked } from "marked";
 import { v4 as uuidv4 } from "uuid";
 import { initSpeechRecognition } from "./speech";
 import type { ToolCall, SendButton, MessageInput, ToolToggles, ToolForm } from "./components/elements";
@@ -74,6 +75,7 @@ function debugLog(message: string): void {
 
 const messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
+let currentAssistantRawText = "";
 const toolCallsMap: Record<string, ToolCall> = {};
 let currentToolCall: ToolCall | null = null;
 let isProcessing = false;
@@ -197,15 +199,13 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
       console.log("[Client] Starting assistant message");
       removeTypingIndicator();
       currentAssistantMessage = addMessage("assistant", "");
+      currentAssistantRawText = "";
     },
 
     onTextMessageContentEvent: (params) => {
       if (currentAssistantMessage && params.event.delta) {
-        console.log("[Client] Adding delta:", params.event.delta);
-        currentAssistantMessage.innerHTML += params.event.delta.replace(
-          /\n/g,
-          "<br>"
-        );
+        currentAssistantRawText += params.event.delta;
+        currentAssistantMessage.innerHTML = marked.parse(currentAssistantRawText, { async: false }) as string;
         scrollToBottom();
       }
     },
@@ -216,10 +216,11 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         messages.push({
           id: params.event.messageId,
           role: "assistant",
-          content: currentAssistantMessage.textContent || "",
+          content: currentAssistantRawText,
         });
       }
       currentAssistantMessage = null;
+      currentAssistantRawText = "";
     },
 
     onRunErrorEvent: (params) => {
@@ -417,7 +418,13 @@ async function continueWithApprovals(approvals: Record<string, boolean>): Promis
 }
 
 
+function isNearBottom(): boolean {
+  const threshold = 150;
+  return (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - threshold);
+}
+
 function scrollToBottom(): void {
+  if (!isNearBottom()) return;
   const anchor = document.getElementById("scroll-anchor");
   if (anchor) {
     anchor.scrollIntoView({ behavior: "auto", block: "end" });

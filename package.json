@@ -27,6 +27,7 @@
   "dependencies": {
     "@ag-ui/client": "^0.0.40",
     "@ag-ui/core": "^0.0.39",
+    "marked": "^17.0.5",
     "uuid": "^13.0.0"
   }
 }

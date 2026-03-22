@@ -65,11 +65,11 @@ function debugLog(message: string): void {
     console.log("[DEBUG]", message);
     return;
   }
-  const spacer = document.getElementById("scroll-anchor")!;
+
   const debugEl = document.createElement("debug-message");
   debugEl.textContent = message;
-  messagesDiv.insertBefore(debugEl, spacer);
-  spacer.scrollIntoView({ behavior: "smooth" });
+  messagesDiv.appendChild(debugEl);
+  scrollToBottom();
 }
 
 
@@ -79,6 +79,8 @@ let currentAssistantRawText = "";
 const toolCallsMap: Record<string, ToolCall> = {};
 let currentToolCall: ToolCall | null = null;
 let isProcessing = false;
+let streamingScrollInterval: ReturnType<typeof setInterval> | null = null;
+let shouldStreamScroll = false;
 
 let agent: HttpAgent;
 
@@ -157,17 +159,8 @@ function listenForPings(
 
 
 function addPingIndicator(): void {
-  const messagesDiv = document.getElementById("messages");
-  if (!messagesDiv) return;
-
-  const spacer = document.getElementById("scroll-anchor");
-  const pingEl = document.createElement("ping-indicator");
-  if (spacer) {
-    messagesDiv.insertBefore(pingEl, spacer);
-  } else {
-    messagesDiv.appendChild(pingEl);
-  }
-  scrollToBottom();
+  const pingEl = document.getElementById("pingIndicator") as any;
+  if (pingEl?.ping) pingEl.ping();
 }
 
 
@@ -198,20 +191,29 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
     onTextMessageStartEvent: (_params) => {
       console.log("[Client] Starting assistant message");
       removeTypingIndicator();
+      shouldStreamScroll = isNearBottom();
       currentAssistantMessage = addMessage("assistant", "");
       currentAssistantRawText = "";
+      if (shouldStreamScroll) {
+        streamingScrollInterval = setInterval(() => {
+          if (shouldStreamScroll) forceScrollToBottom();
+        }, 1000);
+      }
     },
 
     onTextMessageContentEvent: (params) => {
       if (currentAssistantMessage && params.event.delta) {
         currentAssistantRawText += params.event.delta;
         currentAssistantMessage.innerHTML = marked.parse(currentAssistantRawText, { async: false }) as string;
-        scrollToBottom();
       }
     },
 
     onTextMessageEndEvent: (params) => {
       console.log("[Client] Message ended");
+      if (streamingScrollInterval) {
+        clearInterval(streamingScrollInterval);
+        streamingScrollInterval = null;
+      }
       if (currentAssistantMessage) {
         messages.push({
           id: params.event.messageId,
@@ -219,6 +221,8 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
           content: currentAssistantRawText,
         });
       }
+      if (shouldStreamScroll) forceScrollToBottom();
+      shouldStreamScroll = false;
       currentAssistantMessage = null;
       currentAssistantRawText = "";
     },
@@ -252,10 +256,10 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
     subscriber.onToolCallStartEvent = (params) => {
       console.log("[Client] Tool call started:", params.event.toolCallName);
       const messagesDiv = document.getElementById("messages")!;
-      const spacer = document.getElementById("scroll-anchor")!;
+    
       const toolCall = document.createElement("tool-call");
       toolCall.setAttribute("name", params.event.toolCallName);
-      messagesDiv.insertBefore(toolCall, spacer);
+      messagesDiv.appendChild(toolCall);
       scrollToBottom();
       currentToolCall = toolCall;
       toolCallsMap[params.event.toolCallId] = toolCall;
@@ -278,10 +282,10 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
     subscriber.onToolCallResultEvent = (params) => {
       console.log("[Client] Tool call result:", params.event.toolCallId);
       const messagesDiv = document.getElementById("messages")!;
-      const spacer = document.getElementById("scroll-anchor")!;
+    
       const toolResult = document.createElement("tool-result");
       toolResult.setAttribute("content", params.event.content || "No result");
-      messagesDiv.insertBefore(toolResult, spacer);
+      messagesDiv.appendChild(toolResult);
       scrollToBottom();
     };
 
@@ -304,7 +308,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         eventEl.setAttribute("name", `📜 ${params.event.name}`);
         eventEl.textContent = typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2);
         const messagesDiv = document.getElementById("messages")!;
-        messagesDiv.insertBefore(eventEl, messagesDiv.firstChild);
+        messagesDiv.appendChild(eventEl, messagesDiv.firstChild);
         scrollToBottom();
         return;
       }
@@ -317,13 +321,13 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         }
 
         const messagesDiv = document.getElementById("messages")!;
-        const spacer = document.getElementById("scroll-anchor")!;
+      
 
         for (const [filename, dataUrl] of Object.entries(attachments)) {
           const preview = document.createElement("attachment-preview");
           preview.setAttribute("filename", filename);
           preview.setAttribute("src", dataUrl);
-          messagesDiv.insertBefore(preview, spacer);
+          messagesDiv.appendChild(preview);
         }
 
         scrollToBottom();
@@ -368,8 +372,8 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         }
 
         const messagesDiv = document.getElementById("messages")!;
-        const spacer = document.getElementById("scroll-anchor")!;
-        messagesDiv.insertBefore(approvalContainer, spacer);
+      
+        messagesDiv.appendChild(approvalContainer);
         scrollToBottom();
 
         return;
@@ -379,8 +383,8 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
       eventEl.setAttribute("name", `📌 ${params.event.name}`);
       eventEl.textContent = typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2);
       const messagesDiv = document.getElementById("messages")!;
-      const spacer = document.getElementById("scroll-anchor")!;
-      messagesDiv.insertBefore(eventEl, spacer);
+    
+      messagesDiv.appendChild(eventEl);
       scrollToBottom();
     };
   }
@@ -423,22 +427,26 @@ function isNearBottom(): boolean {
   return (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - threshold);
 }
 
-function scrollToBottom(): void {
-  if (!isNearBottom()) return;
+function forceScrollToBottom(): void {
   const anchor = document.getElementById("scroll-anchor");
   if (anchor) {
     anchor.scrollIntoView({ behavior: "auto", block: "end" });
   }
 }
 
+function scrollToBottom(): void {
+  if (!isNearBottom()) return;
+  forceScrollToBottom();
+}
+
 
 function addMessage(role: "user" | "assistant", content: string): HTMLElement {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-anchor")!;
+
   const messageEl = document.createElement("chat-message");
   messageEl.setAttribute("role", role);
   messageEl.textContent = content;
-  messagesDiv.insertBefore(messageEl, spacer);
+  messagesDiv.appendChild(messageEl);
   scrollToBottom();
   return messageEl;
 }
@@ -463,10 +471,10 @@ function removeTypingIndicator(): void {
 
 function showError(message: string): void {
   const messagesDiv = document.getElementById("messages")!;
-  const spacer = document.getElementById("scroll-anchor")!;
+
   const errorEl = document.createElement("error-message");
   errorEl.textContent = "Error: " + message;
-  messagesDiv.insertBefore(errorEl, spacer);
+  messagesDiv.appendChild(errorEl);
   scrollToBottom();
 }
 
@@ -612,9 +620,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       toolToggles.addEventListener("tool-invoke", ((e: CustomEvent) => {
         const { name, a2ui } = e.detail;
         const messagesDiv = document.getElementById("messages")!;
-        const spacer = document.getElementById("scroll-anchor")!;
+      
         const form = document.createElement("tool-form");
-        messagesDiv.insertBefore(form, spacer);
+        messagesDiv.appendChild(form);
         form.setA2UI(name, a2ui);
         form.addEventListener("tool-submit", (async (se: CustomEvent) => {
           form.remove();

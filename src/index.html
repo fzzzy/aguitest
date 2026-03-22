@@ -19,14 +19,22 @@
             align-items: flex-start;
             padding: 20px;
         }
+        #layout {
+            width: 100%;
+            max-width: 900px;
+        }
         chat-container {
             display: flex;
             flex-direction: column;
-            width: 100%;
-            max-width: 800px;
+            flex: 1;
+            min-width: 0;
             min-height: 90vh;
         }
         chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             padding: 20px;
         }
         chat-messages {
@@ -39,8 +47,13 @@
             flex-wrap: wrap;
             padding: 10px 20px;
         }
-        tool-toggles {
+        .tools-row {
+            display: flex;
+            align-items: center;
             width: 100%;
+        }
+        tool-toggles {
+            flex: 1;
         }
         attachments-container {
             width: 100%;
@@ -54,21 +67,25 @@
     </style>
 </head>
 <body>
-    <chat-container>
-        <chat-header>AG-UI Chat</chat-header>
-        <chat-messages id="messages">
+    <div id="layout">
+        <chat-container>
+            <chat-header><ping-indicator id="pingIndicator"></ping-indicator>AG-UI Chat</chat-header>
+            <chat-messages id="messages">
+            </chat-messages>
+            <chat-input-container>
+                <div class="tools-row">
+                    <tool-toggles id="toolToggles"></tool-toggles>
+                    <mic-button id="micButton" title="Start speech recognition"></mic-button>
+                    <attach-button id="attachButton" title="Attach file">+</attach-button>
+                    <input type="file" id="fileInput" accept="text/*,image/*">
+                </div>
+                <attachments-container id="attachments-container"></attachments-container>
+                <message-input id="messageInput"></message-input>
+                <send-button id="sendButton">Send</send-button>
+            </chat-input-container>
             <scroll-anchor id="scroll-anchor"></scroll-anchor>
-        </chat-messages>
-        <chat-input-container>
-            <tool-toggles id="toolToggles"></tool-toggles>
-            <attachments-container id="attachments-container"></attachments-container>
-            <message-input id="messageInput"></message-input>
-            <mic-button id="micButton" title="Start speech recognition"></mic-button>
-            <attach-button id="attachButton" title="Attach file">+</attach-button>
-            <input type="file" id="fileInput" accept="text/*,image/*">
-            <send-button id="sendButton">Send</send-button>
-        </chat-input-container>
-    </chat-container>
+        </chat-container>
+    </div>
     <script type="module" src="/index.ts"></script>
 </body>
 </html>

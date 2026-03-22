@@ -7,14 +7,14 @@ export function sfcPlugin(): Plugin {
     name: 'vite-plugin-sfc',
     enforce: 'pre',
 
-    transform(code: string, id: string) {
+    transform(code: string, _id: string) {
       // Transform: import Foo from './components/foo.sfc.html'
-      // Into: const Foo = (Object.values(import.meta.glob('./components/foo.sfc.html', { eager: true, import: 'default' })) as any)[0]
-      if (id.endsWith('.ts') || id.endsWith('.js')) {
+      // Into: const Foo = Object.values(import.meta.glob('./components/foo.sfc.html', { eager: true }))[0].default
+      if (code.includes('.sfc.html')) {
         const transformed = code.replace(
           /import\s+(\w+)\s+from\s+(['"`])([^'"`]+\.sfc\.html)\2\s*;?/g,
           (_, name, quote, path) =>
-            `const ${name} = (Object.values(import.meta.glob(${quote}${path}${quote}, { eager: true })) as any)[0].default;`
+            `const ${name} = Object.values(import.meta.glob(${quote}${path}${quote}, { eager: true }))[0].default;`
         )
         if (transformed !== code) {
           return transformed

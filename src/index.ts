@@ -1,22 +1,61 @@
 
 import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
 import { v4 as uuidv4 } from "uuid";
-import { registerComponents } from "./sfc";
 import { initSpeechRecognition } from "./speech";
-import type { ToolCall, SendButton, MessageInput } from "./components/elements";
+import type { ToolCall, SendButton, MessageInput, ToolToggles, ToolForm } from "./components/elements";
 
-interface ToolToggles extends HTMLElement {
-  setTools(tools: { name: string; description: string; a2ui: any[] }[]): void;
-  getDisabledTools(): string[];
-}
+import AttachButton from "./components/attach-button.sfc.html";
+import AttachmentChip from "./components/attachment-chip.sfc.html";
+import AttachmentPreview from "./components/attachment-preview.sfc.html";
+import AttachmentsContainer from "./components/attachments-container.sfc.html";
+import ChatContainer from "./components/chat-container.sfc.html";
+import ChatHeader from "./components/chat-header.sfc.html";
+import ChatInputContainer from "./components/chat-input-container.sfc.html";
+import ChatMessage from "./components/chat-message.sfc.html";
+import ChatMessages from "./components/chat-messages.sfc.html";
+import CustomEventDisplay from "./components/custom-event-display.sfc.html";
+import DebugMessage from "./components/debug-message.sfc.html";
+import ErrorMessage from "./components/error-message.sfc.html";
+import MessageInputComponent from "./components/message-input.sfc.html";
+import MicButton from "./components/mic-button.sfc.html";
+import PingIndicator from "./components/ping-indicator.sfc.html";
+import ScrollAnchor from "./components/scroll-anchor.sfc.html";
+import SendButtonComponent from "./components/send-button.sfc.html";
+import ToolApproval from "./components/tool-approval.sfc.html";
+import ToolApprovalItem from "./components/tool-approval-item.sfc.html";
+import ToolCallComponent from "./components/tool-call.sfc.html";
+import ToolForm from "./components/tool-form.sfc.html";
+import ToolResult from "./components/tool-result.sfc.html";
+import ToolToggles from "./components/tool-toggles.sfc.html";
+import TypingIndicator from "./components/typing-indicator.sfc.html";
 
-interface ToolForm extends HTMLElement {
-  setA2UI(toolName: string, messages: any[]): void;
-}
+customElements.define("attach-button", AttachButton);
+customElements.define("attachment-chip", AttachmentChip);
+customElements.define("attachment-preview", AttachmentPreview);
+customElements.define("attachments-container", AttachmentsContainer);
+customElements.define("chat-container", ChatContainer);
+customElements.define("chat-header", ChatHeader);
+customElements.define("chat-input-container", ChatInputContainer);
+customElements.define("chat-message", ChatMessage);
+customElements.define("chat-messages", ChatMessages);
+customElements.define("custom-event-display", CustomEventDisplay);
+customElements.define("debug-message", DebugMessage);
+customElements.define("error-message", ErrorMessage);
+customElements.define("message-input", MessageInputComponent);
+customElements.define("mic-button", MicButton);
+customElements.define("ping-indicator", PingIndicator);
+customElements.define("scroll-anchor", ScrollAnchor);
+customElements.define("send-button", SendButtonComponent);
+customElements.define("tool-approval", ToolApproval);
+customElements.define("tool-approval-item", ToolApprovalItem);
+customElements.define("tool-call", ToolCallComponent);
+customElements.define("tool-form", ToolForm);
+customElements.define("tool-result", ToolResult);
+customElements.define("tool-toggles", ToolToggles);
+customElements.define("typing-indicator", TypingIndicator);
+
 
 const DEBUG = false;
-
-registerComponents('./components/*.sfc.html');
 
 function debugLog(message: string): void {
   if (!DEBUG) return;
@@ -213,7 +252,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
       console.log("[Client] Tool call started:", params.event.toolCallName);
       const messagesDiv = document.getElementById("messages")!;
       const spacer = document.getElementById("scroll-anchor")!;
-      const toolCall = document.createElement("tool-call") as ToolCall;
+      const toolCall = document.createElement("tool-call");
       toolCall.setAttribute("name", params.event.toolCallName);
       messagesDiv.insertBefore(toolCall, spacer);
       scrollToBottom();
@@ -567,7 +606,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const { name, a2ui } = e.detail;
         const messagesDiv = document.getElementById("messages")!;
         const spacer = document.getElementById("scroll-anchor")!;
-        const form = document.createElement("tool-form") as ToolForm;
+        const form = document.createElement("tool-form");
         messagesDiv.insertBefore(form, spacer);
         form.setA2UI(name, a2ui);
         form.addEventListener("tool-submit", (async (se: CustomEvent) => {

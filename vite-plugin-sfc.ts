@@ -8,17 +8,18 @@ export function sfcPlugin(): Plugin {
     enforce: 'pre',
 
     transform(code: string, id: string) {
-      // Transform registerComponents('glob') -> registerComponents(import.meta.glob('glob', { eager: true }))
+      // Transform: import Foo from './components/foo.sfc.html'
+      // Into: const Foo = (Object.values(import.meta.glob('./components/foo.sfc.html', { eager: true, import: 'default' })) as any)[0]
       if (id.endsWith('.ts') || id.endsWith('.js')) {
         const transformed = code.replace(
-          /registerComponents\s*\(\s*(['"`])([^'"`]+)\1\s*\)/g,
-          (_, quote, glob) => `registerComponents(import.meta.glob(${quote}${glob}${quote}, { eager: true }))`
+          /import\s+(\w+)\s+from\s+(['"`])([^'"`]+\.sfc\.html)\2\s*;?/g,
+          (_, name, quote, path) =>
+            `const ${name} = (Object.values(import.meta.glob(${quote}${path}${quote}, { eager: true })) as any)[0].default;`
         )
         if (transformed !== code) {
           return transformed
         }
       }
-      return null
     },
 
     async load(id: string) {

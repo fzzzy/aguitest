@@ -11,13 +11,22 @@ export interface MessageInput extends HTMLElement {
   focus(): void;
 }
 
-export interface PingIndicator extends HTMLElement {}
+export interface ToolToggles extends HTMLElement {
+  setTools(tools: { name: string; description: string; a2ui: any[] }[]): void;
+  getDisabledTools(): string[];
+}
+
+export interface ToolForm extends HTMLElement {
+  setA2UI(toolName: string, messages: any[]): void;
+}
 
 declare global {
   interface HTMLElementTagNameMap {
     'tool-call': ToolCall;
     'send-button': SendButton;
     'message-input': MessageInput;
-    'ping-indicator': PingIndicator;
+
+    'tool-toggles': ToolToggles;
+    'tool-form': ToolForm;
   }
 }

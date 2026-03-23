@@ -7,17 +7,16 @@
     .ping-dot {
       width: 8px;
       height: 8px;
-      background: #4caf50;
+      background: black;
       border-radius: 50%;
-      opacity: 0.3;
       cursor: default;
     }
     .ping-dot.active {
-      animation: pulse 2s ease-out forwards;
+      animation: ping-flash 2s ease-out forwards;
     }
-    @keyframes pulse {
-      0% { opacity: 1; }
-      100% { opacity: 0.3; }
+    @keyframes ping-flash {
+      0% { background: #00ff00; }
+      100% { background: black; }
     }
   </style>
   <div class="ping-dot"></div>

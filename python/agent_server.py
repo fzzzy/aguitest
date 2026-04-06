@@ -21,11 +21,9 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
 from pydantic_ai.ag_ui import run_ag_ui, StateDeps
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
-from pydantic_ai.models import ModelRequestParameters, ModelSettings
+from pydantic_ai.messages import ModelMessage, ModelRequest, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import DeltaToolCall, FunctionModel, AgentInfo
 from pydantic_ai.toolsets import FunctionToolset
-from pydantic_ai.usage import Usage
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from simpleeval import simple_eval

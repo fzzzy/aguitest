@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
-import { transformWithEsbuild } from 'vite'
+import { transformWithOxc } from 'vite'
 
 export function sfcPlugin(): Plugin {
   return {
@@ -57,7 +57,7 @@ function defineComponent(template: HTMLTemplateElement): CustomElementConstructo
 ${scriptContent}
 `
       // Transform TypeScript to JavaScript
-      const result = await transformWithEsbuild(tsCode, filePath + '.ts', {
+      const result = await transformWithOxc(tsCode, filePath + '.ts', {
         loader: 'ts',
         target: 'es2022'
       })

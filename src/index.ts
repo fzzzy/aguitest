@@ -25,9 +25,9 @@ import SendButtonComponent from "./components/send-button.sfc.html";
 import ToolApproval from "./components/tool-approval.sfc.html";
 import ToolApprovalItem from "./components/tool-approval-item.sfc.html";
 import ToolCallComponent from "./components/tool-call.sfc.html";
-import ToolForm from "./components/tool-form.sfc.html";
+import ToolFormComponent from "./components/tool-form.sfc.html";
 import ToolResult from "./components/tool-result.sfc.html";
-import ToolToggles from "./components/tool-toggles.sfc.html";
+import ToolTogglesComponent from "./components/tool-toggles.sfc.html";
 import TypingIndicator from "./components/typing-indicator.sfc.html";
 
 customElements.define("attach-button", AttachButton);
@@ -50,9 +50,9 @@ customElements.define("send-button", SendButtonComponent);
 customElements.define("tool-approval", ToolApproval);
 customElements.define("tool-approval-item", ToolApprovalItem);
 customElements.define("tool-call", ToolCallComponent);
-customElements.define("tool-form", ToolForm);
+customElements.define("tool-form", ToolFormComponent);
 customElements.define("tool-result", ToolResult);
-customElements.define("tool-toggles", ToolToggles);
+customElements.define("tool-toggles", ToolTogglesComponent);
 customElements.define("typing-indicator", TypingIndicator);
 
 
@@ -308,7 +308,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
         eventEl.setAttribute("name", `📜 ${params.event.name}`);
         eventEl.textContent = typeof params.event.value === 'string' ? params.event.value : JSON.stringify(params.event.value, null, 2);
         const messagesDiv = document.getElementById("messages")!;
-        messagesDiv.appendChild(eventEl, messagesDiv.firstChild);
+        messagesDiv.insertBefore(eventEl, messagesDiv.firstChild);
         scrollToBottom();
         return;
       }
@@ -611,7 +611,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Set up tool toggles
     const toolToggles = document.getElementById("toolToggles") as ToolToggles;
     if (availableTools.length > 0) {
-      toolToggles.setTools(availableTools);
+      toolToggles.setTools(availableTools as any);
       toolToggles.addEventListener("tools-changed", ((e: CustomEvent) => {
         if (!agent.state) agent.state = {};
         agent.state.disabled_tools = e.detail.disabledTools;
@@ -640,7 +640,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             removeTypingIndicator();
             showError(error.message || "Failed to invoke tool");
           }
-        }) as EventListener);
+        }) as unknown as EventListener);
         scrollToBottom();
       }) as EventListener);
     } else {

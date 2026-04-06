@@ -1,5 +1,6 @@
 import type { Plugin } from 'vite'
 import fs from 'node:fs'
+import path from 'node:path'
 import { transformWithEsbuild } from 'vite'
 
 export function sfcPlugin(): Plugin {
@@ -7,27 +8,21 @@ export function sfcPlugin(): Plugin {
     name: 'vite-plugin-sfc',
     enforce: 'pre',
 
-    transform(code: string, _id: string) {
-      // Transform: import Foo from './components/foo.sfc.html'
-      // Into: const Foo = Object.values(import.meta.glob('./components/foo.sfc.html', { eager: true }))[0].default
-      if (code.includes('.sfc.html')) {
-        const transformed = code.replace(
-          /import\s+(\w+)\s+from\s+(['"`])([^'"`]+\.sfc\.html)\2\s*;?/g,
-          (_, name, quote, path) =>
-            `const ${name} = Object.values(import.meta.glob(${quote}${path}${quote}, { eager: true }))[0].default;`
-        )
-        if (transformed !== code) {
-          return transformed
-        }
+    resolveId(source: string, importer: string | undefined) {
+      if (source.endsWith('.sfc.html') && importer) {
+        const dir = path.dirname(importer.replace(/\?.*$/, ''))
+        const resolved = path.resolve(dir, source)
+        return resolved + '?sfc'
       }
     },
 
     async load(id: string) {
-      if (!id.endsWith('.sfc.html')) {
+      if (!id.endsWith('.sfc.html?sfc')) {
         return null
       }
 
-      const code = fs.readFileSync(id, 'utf-8')
+      const filePath = id.replace(/\?sfc$/, '')
+      const code = fs.readFileSync(filePath, 'utf-8')
 
       // Parse template and script from SFC
       const templateMatch = code.match(/<template>([\s\S]*?)<\/template>/)
@@ -38,7 +33,7 @@ export function sfcPlugin(): Plugin {
 
       // Script is required if no template, otherwise defaults to defineComponent
       if (!hasTemplate && !scriptMatch) {
-        throw new Error(`${id}: SFC must contain a <template> or <script> block`)
+        throw new Error(`${filePath}: SFC must contain a <template> or <script> block`)
       }
 
       const scriptContent = scriptMatch ? scriptMatch[1].trim() : 'export default defineComponent(template);'
@@ -62,7 +57,7 @@ function defineComponent(template: HTMLTemplateElement): CustomElementConstructo
 ${scriptContent}
 `
       // Transform TypeScript to JavaScript
-      const result = await transformWithEsbuild(tsCode, id + '.ts', {
+      const result = await transformWithEsbuild(tsCode, filePath + '.ts', {
         loader: 'ts',
         target: 'es2022'
       })

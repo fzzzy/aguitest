@@ -8,20 +8,35 @@ export function sfcPlugin(): Plugin {
     name: 'vite-plugin-sfc',
     enforce: 'pre',
 
-    resolveId(source: string, importer: string | undefined) {
-      if (source.endsWith('.sfc.html') && importer) {
-        const dir = path.dirname(importer.replace(/\?.*$/, ''))
-        const resolved = path.resolve(dir, source)
-        return resolved + '?sfc'
+    handleHotUpdate({ file, server }) {
+      if (file.endsWith('.sfc.html')) {
+        server.ws.send({ type: 'full-reload' })
+        return []
       }
     },
 
+    async resolveId(source: string, importer: string | undefined) {
+      if (source.endsWith('.sfc.html')) {
+        // Let Vite resolve the absolute path first
+        const resolution = await this.resolve(source, importer, {
+          skipSelf: true,
+        })
+        if (resolution) {
+          // Prefix with \0 to tell Rolldown this is a virtual module so it doesn't look for it on disk
+          return '\0' + resolution.id + '?sfc'
+        }
+      }
+      return null
+    },
+
     async load(id: string) {
-      if (!id.endsWith('.sfc.html?sfc')) {
+      if (!id.startsWith('\0') || !id.endsWith('.sfc.html?sfc')) {
         return null
       }
 
-      const filePath = id.replace(/\?sfc$/, '')
+      // Remove \0 and ?sfc to get the real file path
+      const filePath = id.slice(1).replace(/\?sfc$/, '')
+      this.addWatchFile(filePath)
       const code = fs.readFileSync(filePath, 'utf-8')
 
       // Parse template and script from SFC

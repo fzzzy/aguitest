@@ -43,7 +43,6 @@ def tool_schema_to_a2ui(tool_name: str, tool: typing.Any) -> list[dict[str, typi
     """Convert a tool's JSON schema into A2UI messages for a form UI."""
     schema = tool.function_schema.json_schema
     properties = schema.get("properties", {})
-    required = set(schema.get("required", []))
 
     children_ids: list[str] = []
     components: list[dict[str, typing.Any]] = []
@@ -505,8 +504,8 @@ async def events(request: Request):
 async def stream_agent_response(
     token: str,
     run_input: RunAgentInput,
-    agent: Agent,
-    deps: StateDeps,
+    agent: Agent[StateDeps[Dependencies], typing.Any],
+    deps: StateDeps[Dependencies],
     on_complete_callback,
     deferred_tool_requests: dict,
     state: dict,
@@ -634,7 +633,7 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
                 description=tool.description,
                 requires_approval=False,
             )
-        agent = Agent(
+        agent = Agent[StateDeps[Dependencies], str](
             injector_model,
             system_prompt=AGENT_INSTRUCTIONS + "\nThe user manually triggered a tool call. Briefly describe the result.",
             toolsets=[auto_approved_toolset],  # type: ignore[list-item]

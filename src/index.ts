@@ -3,7 +3,7 @@ import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
 import { marked } from "marked";
 import { v4 as uuidv4 } from "uuid";
 import { initSpeechRecognition } from "./speech";
-import type { ToolCall, SendButton, MessageInput, ToolToggles, ToolForm } from "./components/elements";
+import type { ToolCall, SendButton, MessageInput, ToolToggles } from "./components/elements";
 
 import AttachButton from "./components/attach-button.sfc.html";
 import AttachmentChip from "./components/attachment-chip.sfc.html";
@@ -77,7 +77,7 @@ const messages: Message[] = [];
 let currentAssistantMessage: HTMLElement | null = null;
 let currentAssistantRawText = "";
 const toolCallsMap: Record<string, ToolCall> = {};
-let currentToolCall: ToolCall | null = null;
+
 let isProcessing = false;
 let streamingScrollInterval: ReturnType<typeof setInterval> | null = null;
 let shouldStreamScroll = false;
@@ -261,7 +261,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
       toolCall.setAttribute("name", params.event.toolCallName);
       messagesDiv.appendChild(toolCall);
       scrollToBottom();
-      currentToolCall = toolCall;
+
       toolCallsMap[params.event.toolCallId] = toolCall;
     };
 
@@ -276,7 +276,7 @@ function createSubscriber(options: SubscriberOptions = {}): AgentSubscriber {
 
     subscriber.onToolCallEndEvent = (params) => {
       console.log("[Client] Tool call ended:", params.event.toolCallId);
-      currentToolCall = null;
+
     };
 
     subscriber.onToolCallResultEvent = (params) => {

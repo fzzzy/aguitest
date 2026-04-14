@@ -9,8 +9,41 @@ from pydantic_ai.models.test import TestModel
 from agent_server import (
     parse_data_url, evaluate_expression, dangerous_tool, 
     process_text_attachment, process_binary_attachment, 
-    tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn
+    tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
+    Session, sessions, ping_all_sessions
 )
+
+@pytest.mark.asyncio
+async def test_ping_all_sessions():
+    from unittest.mock import patch
+    
+    # Setup mock session
+    queue = asyncio.Queue(maxsize=1)
+    mock_session = Session(agent=MagicMock(), queue=queue)
+    sessions["test_token"] = mock_session
+    
+    try:
+        # Mock sleep to raise an exception after the first call to break the while True loop
+        with patch("asyncio.sleep", side_effect=[None, Exception("Stop loop")]):
+            with pytest.raises(Exception, match="Stop loop"):
+                await ping_all_sessions()
+        
+        # Verify ping was put in queue
+        assert queue.qsize() == 1
+        event = queue.get_nowait()
+        assert event == {"ping": True}
+        
+        # Test QueueFull branch
+        queue.put_nowait({"already": "full"})
+        with patch("asyncio.sleep", side_effect=[None, Exception("Stop loop")]):
+            with pytest.raises(Exception, match="Stop loop"):
+                await ping_all_sessions()
+        # Should not raise asyncio.QueueFull due to try-except block
+        
+    finally:
+        # Cleanup
+        if "test_token" in sessions:
+            del sessions["test_token"]
 
 def test_create_agent():
     agent = create_agent()

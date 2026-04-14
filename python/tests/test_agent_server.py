@@ -10,9 +10,58 @@ from agent_server import (
     parse_data_url, evaluate_expression, dangerous_tool, 
     process_text_attachment, process_binary_attachment, 
     tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
-    Session, sessions, ping_all_sessions
+    Session, sessions, ping_all_sessions, lifespan
 )
+import signal
+from fastapi import FastAPI
 
+@pytest.mark.asyncio
+async def test_lifespan():
+    from unittest.mock import patch, Mock, MagicMock
+    
+    app = Mock(spec=FastAPI)
+    mock_loop = Mock()
+    
+    class DummyTask:
+        def __init__(self):
+            self.cancelled = False
+        def cancel(self):
+            self.cancelled = True
+
+    mock_task = DummyTask()
+    
+    with patch("asyncio.get_running_loop", return_value=mock_loop), \
+         patch("signal.getsignal", return_value=Mock()), \
+         patch("asyncio.create_task", return_value=mock_task) as mock_create_task:
+        
+        async with lifespan(app):
+            # Verify signal handlers were added for SIGTERM and SIGINT
+            assert mock_loop.add_signal_handler.call_count == 2
+            
+            # Verify ping task was created
+            mock_create_task.assert_called_once()
+            
+            # Test the signal handler logic
+            handler = mock_loop.add_signal_handler.call_args_list[0][0][1]
+            queue = asyncio.Queue(maxsize=1)
+            sessions["test_token"] = Session(agent=MagicMock(), queue=queue)
+            
+            try:
+                handler()
+                assert queue.qsize() == 1
+                event = queue.get_nowait()
+                assert event == {"die": True}
+            finally:
+                if "test_token" in sessions:
+                    del sessions["test_token"]
+            
+        # Verify ping task was cancelled after yield
+        assert mock_task.cancelled
+        
+        # Capture the real ping_all_sessions coroutine that was passed to create_task
+        # and close it to prevent the "unawaited coroutine" warning.
+        coro = mock_create_task.call_args[0][0]
+        coro.close()
 @pytest.mark.asyncio
 async def test_ping_all_sessions():
     from unittest.mock import patch

@@ -33,3 +33,7 @@ python/generated_memes/
 ._*
 .Spotlight-V100
 .Trashes
+
+# Coverage reports
+.nyc_output/
+coverage-frontend/

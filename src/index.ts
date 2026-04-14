@@ -3,7 +3,10 @@ import { HttpAgent, type Message, type AgentSubscriber } from "@ag-ui/client";
 import { marked } from "marked";
 import { v4 as uuidv4 } from "uuid";
 import { initSpeechRecognition } from "./speech";
+import { helloWorld } from "./hello";
 import type { ToolCall, SendButton, MessageInput, ToolToggles } from "./components/elements";
+
+(window as any).helloWorld = helloWorld;
 
 import AttachButton from "./components/attach-button.sfc.html";
 import AttachmentChip from "./components/attachment-chip.sfc.html";

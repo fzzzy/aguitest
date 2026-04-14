@@ -14,10 +14,15 @@ python/aguitest-venv: python/pyproject.toml
 	cd python && uv sync
 	@touch python/aguitest-venv
 
-check: typecheck lint test
+check: typecheck lint test test-e2e
 
 test: python/aguitest-venv node_modules
-	cd python && uv run pytest tests/ -v --cov=. --cov-report=term-missing
+	cd python && uv run pytest tests/ -v --ignore=tests/test_e2e.py --cov=. --cov-report=term-missing
+
+test-e2e: python/aguitest-venv node_modules
+	rm -rf .nyc_output
+	cd python && uv run pytest tests/test_e2e.py -v
+	npx nyc report --temp-dir .nyc_output --reporter=text --reporter=html --report-dir coverage-frontend
 
 typecheck: python/aguitest-venv
 	cd python && uv run pyright

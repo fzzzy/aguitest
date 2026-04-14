@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { sfcPlugin } from './vite-plugin-sfc'
+import istanbul from 'vite-plugin-istanbul'
 import os from 'os'
 
 function getLocalIP(): string {
@@ -17,7 +18,15 @@ function getLocalIP(): string {
 const localIP = getLocalIP()
 
 export default defineConfig({
-  plugins: [sfcPlugin()],
+  plugins: [
+    sfcPlugin(),
+    istanbul({
+      include: 'src/*',
+      exclude: ['node_modules', 'test/'],
+      extension: ['.js', '.ts', '.vue'],
+      requireEnv: false
+    })
+  ],
   root: 'src',
   define: {
     'process.env': {},

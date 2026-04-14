@@ -1,9 +1,69 @@
 import pytest
 import base64
 import json
+import asyncio
+from unittest.mock import MagicMock
 from pathlib import Path
-from agent_server import parse_data_url, evaluate_expression, dangerous_tool, process_text_attachment, process_binary_attachment, tool_schema_to_a2ui, make_meme
+from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.models.test import TestModel
+from agent_server import (
+    parse_data_url, evaluate_expression, dangerous_tool, 
+    process_text_attachment, process_binary_attachment, 
+    tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn
+)
 
+def test_create_agent():
+    agent = create_agent()
+    assert agent is not None
+    # We just need to verify the agent was created properly without accessing typed internals
+    assert agent.name is None or isinstance(agent.name, str)
+
+@pytest.mark.asyncio
+async def test_make_injector_stream_fn():
+    class MockModel:
+        async def request(self, messages, settings, params):
+            class MockResponse:
+                class MockPart:
+                    content = "Mock summary"
+                parts = [MockPart()]
+            return MockResponse()
+
+    mock_model = MockModel()
+    injector_fn = make_injector_stream_fn("test_tool", '{"arg": "value"}', mock_model)
+    
+    # First call - should yield tool call delta
+    messages = []
+    info = MagicMock()
+    info.model_settings = None
+    info.model_request_parameters = None
+    
+    async_iter_1 = injector_fn(messages, info)
+    result_1 = []
+    async for item in async_iter_1:
+        result_1.append(item)
+        
+    assert len(result_1) == 1
+    assert 0 in result_1[0]
+    assert result_1[0][0].name == "test_tool"
+    assert result_1[0][0].json_args == '{"arg": "value"}'
+    
+    # Check that a UserPromptPart was injected
+    assert len(messages) == 1
+    assert isinstance(messages[0], ModelRequest)
+    assert len(messages[0].parts) == 1
+    assert "test_tool" in messages[0].parts[0].content
+    
+    # Second call - should yield mock model's string response
+    messages = [messages[0]] # Simulate agent loop keeping history
+    async_iter_2 = injector_fn(messages, info)
+    result_2 = []
+    async for item in async_iter_2:
+        result_2.append(item)
+        
+    assert len(result_2) == 1
+    assert result_2[0] == "Mock summary"
+    # Note: messages should now have another injected user prompt, making it 2 items
+    assert len(messages) == 2
 def test_make_meme():
     result_json = make_meme("hello", "world")
     result = json.loads(result_json)

@@ -145,6 +145,8 @@ function listenForPings(
         while ((newlineIndex = buffer.indexOf("\n\n")) !== -1) {
           const message = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 2);
+          
+          console.log("[Client] SSE message:", message);
 
           if (message.startsWith("data: ")) {
             const data = JSON.parse(message.slice(6));

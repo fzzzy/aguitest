@@ -5,6 +5,7 @@ import base64
 import codecs
 import json
 import logging
+import os
 import re
 import signal
 import time
@@ -349,17 +350,25 @@ SignalHandler = Callable[[int, FrameType | None], object] | int | None
 # Global dictionary: token (str) -> Session
 sessions: dict[str, Session] = {}
 
+# Keep strong reference to background tasks
+background_tasks = set()
 
 async def ping_all_sessions():
-    """Send a ping to all connected clients every minute."""
-    while True:
-        await asyncio.sleep(1)
-        ping_event = {"ping": True}
-        for session in sessions.values():
-            try:
-                session.queue.put_nowait(ping_event)
-            except asyncio.QueueFull:
-                pass
+    """Send a ping to all connected clients every minute, or configured interval."""
+    logger.info("Inside ping_all_sessions")
+    try:
+        interval = float(os.environ.get("AGUITEST_PING_INTERVAL", 60.0))
+        logger.info(f"Parsed interval: {interval}")
+        while True:
+            await asyncio.sleep(interval)
+            ping_event = {"ping": True}
+            for session in sessions.values():
+                try:
+                    session.queue.put_nowait(ping_event)
+                except asyncio.QueueFull:
+                    pass
+    except Exception as e:
+        logger.error(f"ping_all_sessions failed: {e}")
 
 
 @asynccontextmanager
@@ -384,6 +393,9 @@ async def lifespan(_app: FastAPI):
 
     # Start ping task
     ping_task = asyncio.create_task(ping_all_sessions())
+    background_tasks.add(ping_task)
+    ping_task.add_done_callback(background_tasks.discard)
+    
     yield
     ping_task.cancel()
 

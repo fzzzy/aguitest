@@ -1,6 +1,7 @@
 """End-to-end tests using Playwright."""
 
 import json
+import os
 import subprocess
 import time
 from collections.abc import Generator
@@ -45,11 +46,13 @@ def servers() -> Generator[None, None, None]:
     else:
         print("Starting backend...")
         backend_log = open("/tmp/aguitest-backend.log", "w")
+        env = {**os.environ, "AGUITEST_PING_INTERVAL": "0.01"}
         backend = subprocess.Popen(
             ["uv", "run", "uvicorn", "agent_server:app", "--host", "0.0.0.0", "--port", "8999"],
             cwd=PROJECT_ROOT / "python",
             stdout=backend_log,
             stderr=backend_log,
+            env=env,
         )
         started_backend = True
 
@@ -139,8 +142,8 @@ def test_hello_world_error(page: Page, base_url: str) -> None:
 
 def test_chat_interaction(page: Page, base_url: str) -> None:
     """Test connecting to the agent and receiving messages."""
-    page.goto(base_url)
-    
+    page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
+    page.goto(base_url)    
     # Wait for the UI to be ready
     chat_container = page.locator("chat-container")
     expect(chat_container).to_be_visible(timeout=5000)
@@ -167,10 +170,31 @@ def test_chat_interaction(page: Page, base_url: str) -> None:
     # Wait for the stream to finish and some response text to appear
     expect(assistant_msg.locator(".content")).not_to_be_empty(timeout=15000)
     
-    # Wait for a ping to arrive (the server sends one every 1 second now)
-    # The active class is toggled on the .ping-dot element inside the shadow root
-    ping_dot = ping_indicator.locator(".ping-dot")
-    expect(ping_dot).to_have_class("ping-dot active", timeout=3000)
+    # Wait for a ping to arrive (the server sends one every 0.01 seconds now)
+    # We check the pingCount property to reliably detect it without fighting CSS animations
+    ping_count = page.evaluate("""() => {
+        return new Promise(resolve => {
+            const pingEl = document.getElementById("pingIndicator");
+            if (!pingEl) return resolve(0);
+            
+            if (pingEl.pingCount > 0) return resolve(pingEl.pingCount);
+            
+            // Poll for pingCount to increase
+            const interval = setInterval(() => {
+                if (pingEl.pingCount > 0) {
+                    clearInterval(interval);
+                    resolve(pingEl.pingCount);
+                }
+            }, 100);
+            
+            // Timeout after 3s
+            setTimeout(() => {
+                clearInterval(interval);
+                resolve(pingEl.pingCount);
+            }, 3000);
+        });
+    }""")
+    assert ping_count > 0, f"Expected ping_count > 0, got {ping_count}"
 
 def test_debug_log(page: Page, base_url: str) -> None:
     """Test the debugLog function."""

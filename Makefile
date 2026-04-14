@@ -20,6 +20,9 @@ test: python/aguitest-venv node_modules
 	cd python && uv run pytest tests/ -v --ignore=tests/test_e2e.py --cov=. --cov-report=term-missing
 
 test-e2e: python/aguitest-venv node_modules
+	@lsof -ti:5173 | xargs kill 2>/dev/null || true
+	@lsof -ti:8999 | xargs kill 2>/dev/null || true
+	@sleep 1
 	rm -rf .nyc_output
 	cd python && uv run pytest tests/test_e2e.py -v
 	npx nyc report --temp-dir .nyc_output --reporter=text --reporter=html --report-dir coverage-frontend

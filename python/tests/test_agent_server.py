@@ -10,10 +10,36 @@ from agent_server import (
     parse_data_url, evaluate_expression, dangerous_tool, 
     process_text_attachment, process_binary_attachment, 
     tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
-    Session, sessions, ping_all_sessions, lifespan
+    Session, sessions, ping_all_sessions, lifespan, app, generated_memes
 )
 import signal
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+client = TestClient(app)
+
+def test_serve_meme():
+    # Test 404
+    response = client.get("/memes/invalid_id")
+    assert response.status_code == 404
+    
+    # Generate a real meme to test 200 OK
+    result_json = make_meme("test", "serve")
+    result = json.loads(result_json)
+    meme_id = result["meme_id"]
+    
+    try:
+        # Test 200
+        response = client.get(f"/memes/{meme_id}")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+    finally:
+        # Cleanup
+        meme_path = generated_memes.get(meme_id)
+        if meme_path and meme_path.exists():
+            meme_path.unlink()
+        if meme_id in generated_memes:
+            del generated_memes[meme_id]
 
 @pytest.mark.asyncio
 async def test_lifespan():

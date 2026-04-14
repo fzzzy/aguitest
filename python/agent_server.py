@@ -275,7 +275,7 @@ toolset.add_function(
 #    )
 #)
 #
-#agent = Agent(
+#agent = Agent[StateDeps[Dependencies], typing.Any](
 #    model=model,
 #    instructions=AGENT_INSTRUCTIONS,
 #    toolsets=[toolset],
@@ -287,7 +287,7 @@ def create_agent() -> Agent[StateDeps[Dependencies]]:
     """Create a new agent instance for a session."""
     model = "google-gla:gemini-3.1-pro-preview"
     logger.info(f"Creating agent with model: {model}")
-    return Agent(
+    return Agent[StateDeps[Dependencies], typing.Any](
         model,
         system_prompt=AGENT_INSTRUCTIONS,
         toolsets=[toolset],  # type: ignore[list-item]
@@ -528,7 +528,7 @@ async def stream_agent_response(
         filtered = toolset.filtered(
             lambda _ctx, tool_def: tool_def.name not in disabled_tools
         )
-        agent = Agent(
+        agent = Agent[StateDeps[Dependencies], typing.Any](
             agent.model,
             system_prompt=AGENT_INSTRUCTIONS,
             toolsets=[filtered],  # type: ignore[list-item]
@@ -641,7 +641,7 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
             deps_type=StateDeps[Dependencies],
         )
 
-    if not manual_call:
+    else:
         agent = session.agent
 
     state: dict[str, typing.Any] = {}

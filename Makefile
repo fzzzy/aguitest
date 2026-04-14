@@ -1,4 +1,4 @@
-.PHONY: build check clean fix lint typecheck run stop tail dev run-backend run-frontend
+.PHONY: build check clean fix lint typecheck test run stop tail dev run-backend run-frontend
 
 # Set UV to use aguitest-venv instead of .venv
 export UV_PROJECT_ENVIRONMENT = aguitest-venv
@@ -14,10 +14,13 @@ python/aguitest-venv: python/pyproject.toml
 	cd python && uv sync
 	@touch python/aguitest-venv
 
-check: typecheck lint
+check: typecheck lint test
+
+test: python/aguitest-venv node_modules
+	cd python && uv run pytest tests/ -v --cov=. --cov-report=term-missing
 
 typecheck: python/aguitest-venv
-	cd python && uv run mypy *.py
+	cd python && uv run pyright
 
 lint: python/aguitest-venv node_modules
 	cd python && uv run ruff check *.py
@@ -69,5 +72,5 @@ run-frontend: node_modules
 	npm run dev
 
 clean:
-	rm -rf python/aguitest-venv python/__pycache__ python/.mypy_cache python/.ruff_cache
+	rm -rf python/aguitest-venv python/__pycache__ python/.mypy_cache python/.ruff_cache python/.pytest_cache
 	rm -rf node_modules dist

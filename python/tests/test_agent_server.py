@@ -3,11 +3,12 @@ import base64
 import json
 import asyncio
 import signal
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch, AsyncMock
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart, ToolCallPart
+from pydantic_ai import DeferredToolRequests
 from pydantic_ai.models.test import TestModel
 from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
 from agent_server import (
@@ -15,10 +16,204 @@ from agent_server import (
     process_text_attachment, process_binary_attachment, 
     tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
     Session, sessions, ping_all_sessions, lifespan, app, generated_memes,
-    process_attachments, stream_agent_response, Dependencies, StateDeps
+    process_attachments, stream_agent_response, Dependencies, StateDeps,
+    agent_run, instrument
 )
 
 client = TestClient(app)
+
+import sys
+
+def test_instrument():
+    from agent_server import instrument
+    # We call instrument to set up the provider
+    instrument("test_service")
+    
+    from opentelemetry import trace
+    tracer = trace.get_tracer("test_tracer")
+    
+    # Create a span to ensure CustomConsoleSpanExporter.export is called
+    with tracer.start_as_current_span("test_span"):
+        pass
+        
+    # Force flush to process the batch and call export()
+    provider = trace.get_tracer_provider()
+    if hasattr(provider, "force_flush"):
+        provider.force_flush()  # type: ignore[attr-defined]
+
+@pytest.mark.asyncio
+async def test_agent_run_on_complete_callback():
+    token = "test_on_complete_token"
+    agent = create_agent()
+    mock_session = Session(agent=agent, queue=asyncio.Queue())
+    sessions[token] = mock_session
+
+    request = MagicMock(spec=Request)
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = None
+    
+    callback_executed = False
+
+    with patch("agent_server.stream_agent_response") as mock_stream:
+        async def mock_gen(*args, **kwargs):
+            nonlocal callback_executed
+            on_complete = args[4] # on_complete_callback is the 5th positional arg
+            deferred_reqs = args[5] # deferred_tool_requests is the 6th positional arg
+
+            # Simulate a result with DeferredToolRequests
+            mock_result = MagicMock()
+            mock_result.output = DeferredToolRequests()
+
+            # Add a real ToolCallPart so isinstance works
+            real_part = ToolCallPart(
+                tool_call_id="test-tool-id",
+                tool_name="test_tool",
+                args={"arg1": "val1"}
+            )
+
+            # Use a real ModelResponse (from pydantic_ai.messages)
+            from pydantic_ai.messages import ModelResponse
+            mock_result.response = ModelResponse(parts=[real_part])
+
+            if on_complete:
+                try:
+                    on_complete(mock_result)
+                    callback_executed = True
+                except Exception as e:
+                    print(f"Callback failed: {e}")
+                    
+            yield "data: ok\n\n"
+
+            
+        mock_stream.side_effect = mock_gen
+        
+        response = await agent_run(request, run_input, token)
+        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        await anext(gen)
+        
+        assert callback_executed
+        
+        # Check that deferred_tool_requests was populated
+        assert mock_stream.call_args is not None
+        deferred_reqs_passed = mock_stream.call_args[0][5]
+        assert "test-tool-id" in deferred_reqs_passed
+        assert deferred_reqs_passed["test-tool-id"]["tool_name"] == "test_tool"
+        
+        del sessions[token]
+
+@pytest.mark.asyncio
+async def test_agent_run_invalid_token():
+    request = MagicMock(spec=Request)
+    run_input = MagicMock(spec=RunAgentInput)
+    with pytest.raises(HTTPException) as excinfo:
+        await agent_run(request, run_input, "invalid_token")
+    assert excinfo.value.status_code == 404
+
+@pytest.mark.asyncio
+async def test_agent_run_cancel_task():
+    token = "test_cancel_token"
+    mock_session = Session(agent=MagicMock(), queue=asyncio.Queue())
+    
+    # Setup a dummy task that raises CancelledError when awaited
+    async def dummy_task_fn():
+        raise asyncio.CancelledError()
+        
+    dummy_task = asyncio.create_task(dummy_task_fn())
+    mock_session.current_task = dummy_task
+    sessions[token] = mock_session
+    
+    request = MagicMock(spec=Request)
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = None
+    
+    with patch("agent_server.stream_agent_response") as mock_stream:
+        # Mock the stream to just yield one item
+        async def mock_gen(*args, **kwargs):
+            yield "data: ok\n\n"
+        mock_stream.side_effect = mock_gen
+        
+        response = await agent_run(request, run_input, token)
+        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        
+        chunk = await anext(gen)
+        assert chunk == "data: ok\n\n"
+        
+        # Verify the task was cancelled
+        assert dummy_task.cancelled() or dummy_task.done()
+        
+        # Clean up
+        del sessions[token]
+
+@pytest.mark.asyncio
+async def test_agent_run_manual_call():
+    token = "test_manual_token"
+    agent = create_agent()
+    mock_session = Session(agent=agent, queue=asyncio.Queue())
+    sessions[token] = mock_session
+    
+    request = MagicMock(spec=Request)
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = {
+        "manual_tool_call": {
+            "name": "evaluate_expression",
+            "args": {"expression": "2+2"}
+        }
+    }
+    
+    with patch("agent_server.stream_agent_response") as mock_stream:
+        async def mock_gen(*args, **kwargs):
+            # Verify the agent passed to stream_agent_response has the injector model
+            passed_agent = args[2]
+            assert passed_agent.model.model_name == "manual-tool-injector"
+            yield "data: ok\n\n"
+        mock_stream.side_effect = mock_gen
+        
+        response = await agent_run(request, run_input, token)
+        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        
+        chunk = await anext(gen)
+        assert chunk == "data: ok\n\n"
+        
+        # Clean up
+        del sessions[token]
+
+@pytest.mark.asyncio
+async def test_agent_run_generator_exit():
+    token = "test_exit_token"
+    mock_session = Session(agent=MagicMock(), queue=asyncio.Queue())
+    sessions[token] = mock_session
+    
+    request = MagicMock(spec=Request)
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = None
+    
+    state_dict = {}
+    mock_ag_ui_events = MagicMock()
+    mock_ag_ui_events.aclose = AsyncMock()
+    
+    with patch("agent_server.stream_agent_response") as mock_stream:
+        async def mock_gen(*args, **kwargs):
+            # args[6] is state dictionary
+            args[6]["ag_ui_events"] = mock_ag_ui_events
+            yield "data: chunk1\n\n"
+            raise asyncio.CancelledError()
+            
+        mock_stream.side_effect = mock_gen
+        
+        response = await agent_run(request, run_input, token)
+        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        
+        chunk = await anext(gen)
+        assert chunk == "data: chunk1\n\n"
+        
+        with pytest.raises(asyncio.CancelledError):
+            await anext(gen)
+            
+        # Verify aclose was called
+        mock_ag_ui_events.aclose.assert_called_once()
+        
+        # Clean up
+        del sessions[token]
 
 @pytest.mark.asyncio
 async def test_stream_agent_response():

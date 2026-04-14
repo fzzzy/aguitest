@@ -59,10 +59,10 @@ customElements.define("tool-toggles", ToolTogglesComponent);
 customElements.define("typing-indicator", TypingIndicator);
 
 
-const DEBUG = false;
+const DEBUG = (window as any).__DEBUG || false;
 
-function debugLog(message: string): void {
-  if (!DEBUG) return;
+export function debugLog(message: string): void {
+  if (!(window as any).__DEBUG && !DEBUG) return;
   const messagesDiv = document.getElementById("messages");
   if (!messagesDiv) {
     console.log("[DEBUG]", message);
@@ -74,6 +74,8 @@ function debugLog(message: string): void {
   messagesDiv.appendChild(debugEl);
   scrollToBottom();
 }
+
+(window as any).debugLog = debugLog;
 
 
 const messages: Message[] = [];

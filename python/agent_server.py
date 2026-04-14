@@ -353,7 +353,7 @@ sessions: dict[str, Session] = {}
 async def ping_all_sessions():
     """Send a ping to all connected clients every minute."""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(1)
         ping_event = {"ping": True}
         for session in sessions.values():
             try:

@@ -10,13 +10,101 @@ from agent_server import (
     parse_data_url, evaluate_expression, dangerous_tool, 
     process_text_attachment, process_binary_attachment, 
     tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
-    Session, sessions, ping_all_sessions, lifespan, app, generated_memes
+    Session, sessions, ping_all_sessions, lifespan, app, generated_memes,
+    process_attachments
 )
 import signal
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
 
 client = TestClient(app)
+
+def test_process_attachments():
+    from unittest.mock import MagicMock
+    
+    # Setup mock input with attachments
+    text_data = base64.b64encode(b"Hello from file").decode("utf-8")
+    binary_data = base64.b64encode(b"\x89PNG\r\n\x1a\n").decode("utf-8")
+    
+    attachments = {
+        "hello.txt": f"data:text/plain;base64,{text_data}",
+        "image.png": f"data:image/png;base64,{binary_data}",
+        "invalid": "not-a-data-url"
+    }
+    
+    # Mock message
+    mock_msg = MagicMock()
+    mock_msg.role = "user"
+    mock_msg.content = "User prompt"
+    
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = {"attachments": attachments}
+    run_input.messages = [mock_msg]
+    
+    result = process_attachments(run_input)
+    
+    # Verify result dictionary
+    assert "hello.txt" in result
+    assert "image.png" in result
+    assert "invalid" not in result
+    
+    # Verify content was updated
+    assert isinstance(mock_msg.content, list)
+    assert len(mock_msg.content) == 3 # original text + 2 attachments
+    
+    assert any(isinstance(c, TextInputContent) and "hello.txt" in c.text for c in mock_msg.content)
+    assert any(isinstance(c, BinaryInputContent) and c.filename == "image.png" for c in mock_msg.content)
+
+def test_process_attachments_no_user_messages():
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = {"attachments": {"f.txt": "data:text/plain;base64,WA=="}}
+    
+    # Message is not a user role
+    mock_msg = MagicMock()
+    mock_msg.role = "system"
+    run_input.messages = [mock_msg]
+    
+    result = process_attachments(run_input)
+    assert result == {}
+    
+def test_process_attachments_list_content():
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = {"attachments": {"f.txt": "data:text/plain;base64,WA=="}}
+    
+    mock_msg = MagicMock()
+    mock_msg.role = "user"
+    existing_content = TextInputContent(text="existing list")
+    mock_msg.content = [existing_content]
+    run_input.messages = [mock_msg]
+    
+    result = process_attachments(run_input)
+    assert "f.txt" in result
+    assert isinstance(mock_msg.content, list)
+    assert len(mock_msg.content) == 2
+    assert mock_msg.content[0] == existing_content
+    
+def test_process_attachments_unknown_content_type():
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = {"attachments": {"f.txt": "data:text/plain;base64,WA=="}}
+    
+    mock_msg = MagicMock()
+    mock_msg.role = "user"
+    mock_msg.content = None # Not a string, not a list
+    run_input.messages = [mock_msg]
+    
+    result = process_attachments(run_input)
+    assert "f.txt" in result
+    assert isinstance(mock_msg.content, list)
+    assert len(mock_msg.content) == 1
+
+def test_process_attachments_no_messages():
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.state = {"attachments": {"f.txt": "data:text/plain;base64,WA=="}}
+    run_input.messages = []
+    
+    result = process_attachments(run_input)
+    assert result == {}
 
 def test_serve_meme():
     # Test 404

@@ -30,6 +30,10 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 pythonpath = ["."]
+# Ignore DeprecationWarning from google-genai 1.68.0 upstream bug
+filterwarnings = [
+    "ignore:'_UnionGenericAlias' is deprecated:DeprecationWarning",
+]
 
 [tool.ruff.lint]
 extend-select = ["PLC0415"]

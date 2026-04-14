@@ -1,6 +1,21 @@
 import pytest
 import base64
-from agent_server import parse_data_url, evaluate_expression, dangerous_tool, process_text_attachment, process_binary_attachment, tool_schema_to_a2ui
+import json
+from pathlib import Path
+from agent_server import parse_data_url, evaluate_expression, dangerous_tool, process_text_attachment, process_binary_attachment, tool_schema_to_a2ui, make_meme
+
+def test_make_meme():
+    result_json = make_meme("hello", "world")
+    result = json.loads(result_json)
+    assert "url" in result
+    assert "meme_id" in result
+    
+    meme_id = result["meme_id"]
+    meme_path = Path(__file__).parent.parent / "generated_memes" / f"meme_{meme_id}.png"
+    assert meme_path.exists()
+    
+    # Cleanup
+    meme_path.unlink()
 
 def test_parse_data_url_valid():
     result = parse_data_url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB")

@@ -21,6 +21,10 @@ def test_evaluate_expression_error():
     result = evaluate_expression("1 / 0")
     assert "inf" in result
 
+def test_evaluate_expression_invalid_syntax():
+    result = evaluate_expression("2 + ")
+    assert "Error evaluating expression" in result
+
 def test_dangerous_tool():
     result = dangerous_tool("testing")
     assert result == "grfgvat"

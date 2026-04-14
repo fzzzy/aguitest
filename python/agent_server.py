@@ -27,7 +27,17 @@ from pydantic_ai.toolsets import FunctionToolset
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from simpleeval import simple_eval
-from starlette.responses import StreamingResponse
+from starlette.responses import StreamingResponse, FileResponse
+
+from opentelemetry import trace
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    ConsoleSpanExporter,
+    SpanExportResult,
+)
+from pydantic_ai import InstrumentationSettings
 
 logger = logging.getLogger("agent_server")
 logger.setLevel(logging.DEBUG)
@@ -386,7 +396,6 @@ async def serve_meme(meme_id: str):
     filepath = generated_memes.get(meme_id)
     if not filepath or not filepath.exists():
         raise HTTPException(status_code=404, detail="Meme not found")
-    from starlette.responses import FileResponse
     return FileResponse(filepath, media_type="image/png")
 
 
@@ -668,16 +677,6 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
 
 
 def instrument(service_name: str = "default") -> None:
-    from opentelemetry import trace
-    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-    from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
-    from opentelemetry.sdk.trace.export import (
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-        SpanExportResult,
-    )
-
-    from pydantic_ai import InstrumentationSettings
 
     class CustomConsoleSpanExporter(ConsoleSpanExporter):
         def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
@@ -700,5 +699,5 @@ def instrument(service_name: str = "default") -> None:
     Agent.instrument_all(InstrumentationSettings(version=3))
 
 
-if DEBUG:
+if DEBUG:  # pragma: no cover
     instrument()

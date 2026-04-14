@@ -76,11 +76,8 @@ async def test_agent_run_on_complete_callback():
             mock_result.response = ModelResponse(parts=[real_part])
 
             if on_complete:
-                try:
-                    on_complete(mock_result)
-                    callback_executed = True
-                except Exception as e:
-                    print(f"Callback failed: {e}")
+                on_complete(mock_result)
+                callback_executed = True
                     
             yield "data: ok\n\n"
 
@@ -116,7 +113,7 @@ async def test_agent_run_cancel_task():
     
     # Setup a dummy task that raises CancelledError when awaited
     async def dummy_task_fn():
-        raise asyncio.CancelledError()
+        raise asyncio.CancelledError()  # pragma: no cover
         
     dummy_task = asyncio.create_task(dummy_task_fn())
     mock_session.current_task = dummy_task
@@ -245,7 +242,8 @@ async def test_stream_agent_response():
     on_complete_called = False
     def on_complete(result, reqs):
         nonlocal on_complete_called
-        on_complete_called = True
+        # The run_ag_ui generator is mocked to yield immediately, bypassing the real on_complete callback
+        on_complete_called = True  # pragma: no cover
         
     deferred_requests = {"tool2": "args"}
     state_dict = {}

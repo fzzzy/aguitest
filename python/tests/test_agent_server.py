@@ -15,10 +15,85 @@ from agent_server import (
     process_text_attachment, process_binary_attachment, 
     tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
     Session, sessions, ping_all_sessions, lifespan, app, generated_memes,
-    process_attachments
+    process_attachments, stream_agent_response, Dependencies, StateDeps
 )
 
 client = TestClient(app)
+
+@pytest.mark.asyncio
+async def test_stream_agent_response():
+    from unittest.mock import patch, MagicMock
+    token = "test_stream_token"
+    agent = create_agent()
+    deps = StateDeps(Dependencies())
+    
+    # 1. Setup mock run_input
+    mock_msg = MagicMock()
+    mock_msg.role = "user"
+    mock_msg.content = "User prompt"
+    
+    text_data = base64.b64encode(b"Attachment data").decode("utf-8")
+    run_input = MagicMock(spec=RunAgentInput)
+    run_input.messages = [mock_msg]
+    run_input.state = {
+        "deferred_tool_approvals": {"tool1": True},
+        "attachments": {"f.txt": f"data:text/plain;base64,{text_data}"},
+        "disabled_tools": ["dangerous_tool"]
+    }
+    
+    # 2. Mock run_ag_ui generator
+    async def mock_run_ag_ui(*args, **kwargs):
+        yield 'data: {"type": "RUN_STARTED"}\n\n'
+        yield 'data: {"type": "RUN_FINISHED"}\n\n'
+        yield 'data: {"type": "OTHER"}\n\n'
+        
+    on_complete_called = False
+    def on_complete(result, reqs):
+        nonlocal on_complete_called
+        on_complete_called = True
+        
+    deferred_requests = {"tool2": "args"}
+    state_dict = {}
+    
+    with patch("agent_server.run_ag_ui", side_effect=mock_run_ag_ui):
+        gen = stream_agent_response(
+            token=token,
+            run_input=run_input,
+            agent=agent,
+            deps=deps,
+            on_complete_callback=on_complete,
+            deferred_tool_requests=deferred_requests,
+            state=state_dict
+        )
+        
+        # 1. RUN_STARTED
+        first_chunk = await anext(gen)
+        assert "RUN_STARTED" in first_chunk
+        
+        # 2. CustomEvent: instructions (because len(run_input.messages) == 1)
+        instr_chunk = await anext(gen)
+        assert '"name": "instructions"' in instr_chunk
+        
+        # 3. CustomEvent: attachments
+        att_chunk = await anext(gen)
+        assert '"name": "attachments"' in att_chunk
+        assert "f.txt" in att_chunk
+        
+        # 4. CustomEvent: deferred_tool_requests (yielded before RUN_FINISHED is passed through)
+        deferred_chunk = await anext(gen)
+        assert '"name": "deferred_tool_requests"' in deferred_chunk
+        assert "tool2" in deferred_chunk
+        
+        # 5. RUN_FINISHED
+        finished_chunk = await anext(gen)
+        assert "RUN_FINISHED" in finished_chunk
+        
+        # 6. OTHER
+        other_chunk = await anext(gen)
+        assert "OTHER" in other_chunk
+        
+        with pytest.raises(StopAsyncIteration):
+            await anext(gen)
 
 def test_process_attachments():
     # Setup mock input with attachments
@@ -130,7 +205,7 @@ def test_serve_meme():
 from fastapi import Request
 from agent_server import events
 
-from typing import AsyncIterator, cast
+from typing import AsyncGenerator, cast
 
 @pytest.mark.asyncio
 async def test_events_sse():
@@ -141,7 +216,7 @@ async def test_events_sse():
     assert response.media_type == "text/event-stream"
     
     # Get the async generator from the StreamingResponse
-    gen = cast(AsyncIterator[str], response.body_iterator)
+    gen = cast(AsyncGenerator[str, None], response.body_iterator)
     
     # 1. First event: agent info
     first_chunk = await anext(gen)
@@ -169,6 +244,47 @@ async def test_events_sse():
         await anext(gen)
         
     # Verify cleanup happened after stream closed
+    assert token not in sessions
+
+@pytest.mark.asyncio
+async def test_events_sse_cancelled():
+    request = MagicMock(spec=Request)
+    response = await events(request)
+    gen = cast(AsyncGenerator[str, None], response.body_iterator)
+    
+    first_chunk = await anext(gen)
+    data = json.loads(first_chunk.strip()[6:])
+    token = data["agent"].split("token=")[1]
+    
+    # Throw a CancelledError into the generator to simulate disconnect.
+    # The generator catches it and exits gracefully, which results in StopAsyncIteration
+    with pytest.raises(StopAsyncIteration):
+        await gen.athrow(asyncio.CancelledError())
+        
+    assert token not in sessions
+
+@pytest.mark.asyncio
+async def test_events_sse_task_cancellation():
+    request = MagicMock(spec=Request)
+    response = await events(request)
+    gen = cast(AsyncGenerator[str, None], response.body_iterator)
+    
+    first_chunk = await anext(gen)
+    data = json.loads(first_chunk.strip()[6:])
+    token = data["agent"].split("token=")[1]
+    session = sessions[token]
+    
+    # Assign a dummy task
+    dummy_task = MagicMock()
+    dummy_task.done.return_value = False
+    session.current_task = dummy_task
+    
+    session.queue.put_nowait({"die": True})
+    await anext(gen) # consume die event
+    with pytest.raises(StopAsyncIteration):
+        await anext(gen)
+        
+    dummy_task.cancel.assert_called_once()
     assert token not in sessions
 
 @pytest.mark.asyncio

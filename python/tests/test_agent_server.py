@@ -2,10 +2,14 @@ import pytest
 import base64
 import json
 import asyncio
-from unittest.mock import MagicMock
+import signal
+from unittest.mock import MagicMock, Mock, patch
 from pathlib import Path
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
 from pydantic_ai.models.test import TestModel
+from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
 from agent_server import (
     parse_data_url, evaluate_expression, dangerous_tool, 
     process_text_attachment, process_binary_attachment, 
@@ -13,16 +17,10 @@ from agent_server import (
     Session, sessions, ping_all_sessions, lifespan, app, generated_memes,
     process_attachments
 )
-import signal
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
 
 client = TestClient(app)
 
 def test_process_attachments():
-    from unittest.mock import MagicMock
-    
     # Setup mock input with attachments
     text_data = base64.b64encode(b"Hello from file").decode("utf-8")
     binary_data = base64.b64encode(b"\x89PNG\r\n\x1a\n").decode("utf-8")
@@ -129,11 +127,53 @@ def test_serve_meme():
         if meme_id in generated_memes:
             del generated_memes[meme_id]
 
+from fastapi import Request
+from agent_server import events
+
+from typing import AsyncIterator, cast
+
+@pytest.mark.asyncio
+async def test_events_sse():
+    # Call the endpoint directly to avoid cross-thread event loop issues with asyncio.Queue
+    request = MagicMock(spec=Request)
+    response = await events(request)
+    
+    assert response.media_type == "text/event-stream"
+    
+    # Get the async generator from the StreamingResponse
+    gen = cast(AsyncIterator[str], response.body_iterator)
+    
+    # 1. First event: agent info
+    first_chunk = await anext(gen)
+    assert first_chunk.startswith("data: ")
+    data = json.loads(first_chunk.strip()[6:])
+    assert "agent" in data
+    assert "available_tools" in data
+    
+    token = data["agent"].split("token=")[1]
+    assert token in sessions
+    session = sessions[token]
+    
+    # 2. Custom event
+    session.queue.put_nowait({"hello": "world"})
+    custom_chunk = await anext(gen)
+    assert json.loads(custom_chunk.strip()[6:]) == {"hello": "world"}
+    
+    # 3. Shutdown event
+    session.queue.put_nowait({"die": True})
+    die_chunk = await anext(gen)
+    assert die_chunk == "event: die\ndata: shutdown\n\n"
+    
+    # 4. Stream should terminate
+    with pytest.raises(StopAsyncIteration):
+        await anext(gen)
+        
+    # Verify cleanup happened after stream closed
+    assert token not in sessions
+
 @pytest.mark.asyncio
 async def test_lifespan():
-    from unittest.mock import patch, Mock, MagicMock
-    
-    app = Mock(spec=FastAPI)
+    app_mock = Mock(spec=FastAPI)
     mock_loop = Mock()
     
     class DummyTask:
@@ -148,7 +188,7 @@ async def test_lifespan():
          patch("signal.getsignal", return_value=Mock()), \
          patch("asyncio.create_task", return_value=mock_task) as mock_create_task:
         
-        async with lifespan(app):
+        async with lifespan(app_mock):
             # Verify signal handlers were added for SIGTERM and SIGINT
             assert mock_loop.add_signal_handler.call_count == 2
             
@@ -176,10 +216,9 @@ async def test_lifespan():
         # and close it to prevent the "unawaited coroutine" warning.
         coro = mock_create_task.call_args[0][0]
         coro.close()
+
 @pytest.mark.asyncio
 async def test_ping_all_sessions():
-    from unittest.mock import patch
-    
     # Setup mock session
     queue = asyncio.Queue(maxsize=1)
     mock_session = Session(agent=MagicMock(), queue=queue)
@@ -260,6 +299,7 @@ async def test_make_injector_stream_fn():
     assert result_2[0] == "Mock summary"
     # Note: messages should now have another injected user prompt, making it 2 items
     assert len(messages) == 2
+
 def test_make_meme():
     result_json = make_meme("hello", "world")
     result = json.loads(result_json)
@@ -390,4 +430,3 @@ def test_tool_schema_to_a2ui_boolean():
     assert "Checkbox" in active_field["component"]
     assert active_field["component"]["Checkbox"]["label"] == {"literalString": "active"}
     assert active_field["component"]["Checkbox"]["dataModelKey"] == "active"
-

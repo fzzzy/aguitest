@@ -294,10 +294,16 @@ toolset.add_function(
 #    deps_type=StateDeps[Dependencies],
 #)
 
-def create_agent() -> Agent[StateDeps[Dependencies]]:
+def create_agent() -> Agent[StateDeps[Dependencies], typing.Any]:
     """Create a new agent instance for a session."""
-    model = "google-gla:gemini-3.1-pro-preview"
-    logger.info(f"Creating agent with model: {model}")
+    if os.environ.get("AGUITEST_IS_TEST_SUITE"):
+        from pydantic_ai.models.test import TestModel
+        model = TestModel(call_tools=[], custom_output_text="Hello from TestModel!")
+        logger.info("Creating agent with TestModel for test suite")
+    else:
+        model = "google-gla:gemini-3.1-pro-preview"
+        logger.info(f"Creating agent with model: {model}")
+        
     return Agent[StateDeps[Dependencies], typing.Any](
         model,
         system_prompt=AGENT_INSTRUCTIONS,

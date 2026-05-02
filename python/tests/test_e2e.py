@@ -46,7 +46,11 @@ def servers() -> Generator[None, None, None]:
     else:
         print("Starting backend...")
         backend_log = open("/tmp/aguitest-backend.log", "w")
-        env = {**os.environ, "AGUITEST_PING_INTERVAL": "0.01"}
+        env = {
+            **os.environ, 
+            "AGUITEST_PING_INTERVAL": "0.01",
+            "AGUITEST_IS_TEST_SUITE": "1"
+        }
         backend = subprocess.Popen(
             ["uv", "run", "uvicorn", "agent_server:app", "--host", "0.0.0.0", "--port", "8999"],
             cwd=PROJECT_ROOT / "python",

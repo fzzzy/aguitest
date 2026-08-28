@@ -1,35 +1,63 @@
-import pytest
-import base64
-import json
 import asyncio
-import signal
-from unittest.mock import MagicMock, Mock, patch, AsyncMock
+import base64
+import gc
+import json
+import logging
 from pathlib import Path
+from typing import ClassVar
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+from ag_ui.core.types import (
+    BinaryInputContent,
+    RunAgentInput,
+    TextInputContent,
+    UserMessage,
+)
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart, ToolCallPart
-from pydantic_ai import DeferredToolRequests
-from pydantic_ai.models.test import TestModel
-from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
+from opentelemetry import trace
+from pydantic_ai import Agent, DeferredToolRequests
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    ToolCallPart,
+)
+from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.ui.ag_ui import AGUIAdapter
+
 from agent_server import (
-    parse_data_url, evaluate_expression, dangerous_tool, 
-    process_text_attachment, process_binary_attachment, 
-    tool_schema_to_a2ui, make_meme, create_agent, make_injector_stream_fn,
-    Session, sessions, ping_all_sessions, lifespan, app, generated_memes,
-    process_attachments, stream_agent_response, Dependencies, StateDeps,
-    agent_run, instrument
+    Dependencies,
+    Session,
+    StateDeps,
+    agent_run,
+    app,
+    background_tasks,
+    create_agent,
+    dangerous_tool,
+    evaluate_expression,
+    generated_memes,
+    instrument,
+    lifespan,
+    make_injector_stream_fn,
+    make_meme,
+    parse_data_url,
+    ping_all_sessions,
+    process_attachments,
+    process_binary_attachment,
+    process_text_attachment,
+    sessions,
+    stream_agent_response,
+    tool_schema_to_a2ui,
 )
 
 client = TestClient(app)
 
-import sys
 
 def test_instrument():
-    from agent_server import instrument
     # We call instrument to set up the provider
     instrument("test_service")
     
-    from opentelemetry import trace
     tracer = trace.get_tracer("test_tracer")
     
     # Create a span to ensure CustomConsoleSpanExporter.export is called
@@ -58,7 +86,7 @@ async def test_agent_run_on_complete_callback():
         async def mock_gen(*args, **kwargs):
             nonlocal callback_executed
             on_complete = args[4] # on_complete_callback is the 5th positional arg
-            deferred_reqs = args[5] # deferred_tool_requests is the 6th positional arg
+            _deferred_reqs = args[5] # deferred_tool_requests is the 6th positional arg
 
             # Simulate a result with DeferredToolRequests
             mock_result = MagicMock()
@@ -72,7 +100,6 @@ async def test_agent_run_on_complete_callback():
             )
 
             # Use a real ModelResponse (from pydantic_ai.messages)
-            from pydantic_ai.messages import ModelResponse
             mock_result.response = ModelResponse(parts=[real_part])
 
             if on_complete:
@@ -85,7 +112,7 @@ async def test_agent_run_on_complete_callback():
         mock_stream.side_effect = mock_gen
         
         response = await agent_run(request, run_input, token)
-        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        gen = cast(AsyncGenerator[str], response.body_iterator)
         await anext(gen)
         
         assert callback_executed
@@ -130,7 +157,7 @@ async def test_agent_run_cancel_task():
         mock_stream.side_effect = mock_gen
         
         response = await agent_run(request, run_input, token)
-        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        gen = cast(AsyncGenerator[str], response.body_iterator)
         
         chunk = await anext(gen)
         assert chunk == "data: ok\n\n"
@@ -166,7 +193,7 @@ async def test_agent_run_manual_call():
         mock_stream.side_effect = mock_gen
         
         response = await agent_run(request, run_input, token)
-        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        gen = cast(AsyncGenerator[str], response.body_iterator)
         
         chunk = await anext(gen)
         assert chunk == "data: ok\n\n"
@@ -184,7 +211,6 @@ async def test_agent_run_generator_exit():
     run_input = MagicMock(spec=RunAgentInput)
     run_input.state = None
     
-    state_dict = {}
     mock_ag_ui_events = MagicMock()
     mock_ag_ui_events.aclose = AsyncMock()
     
@@ -198,7 +224,7 @@ async def test_agent_run_generator_exit():
         mock_stream.side_effect = mock_gen
         
         response = await agent_run(request, run_input, token)
-        gen = cast(AsyncGenerator[str, None], response.body_iterator)
+        gen = cast(AsyncGenerator[str], response.body_iterator)
         
         chunk = await anext(gen)
         assert chunk == "data: chunk1\n\n"
@@ -214,7 +240,6 @@ async def test_agent_run_generator_exit():
 
 @pytest.mark.asyncio
 async def test_stream_agent_response():
-    from unittest.mock import patch, MagicMock
     token = "test_stream_token"
     agent = create_agent()
     deps = StateDeps(Dependencies())
@@ -233,22 +258,25 @@ async def test_stream_agent_response():
         "disabled_tools": ["dangerous_tool"]
     }
     
-    # 2. Mock run_ag_ui generator
-    async def mock_run_ag_ui(*args, **kwargs):
+    # 2. Mock the AG-UI adapter's encoded SSE stream
+    async def mock_encode_stream(*args, **kwargs):
         yield 'data: {"type": "RUN_STARTED"}\n\n'
         yield 'data: {"type": "RUN_FINISHED"}\n\n'
         yield 'data: {"type": "OTHER"}\n\n'
-        
+
+    mock_adapter = MagicMock()
+    mock_adapter.encode_stream.side_effect = mock_encode_stream
+
     on_complete_called = False
     def on_complete(result, reqs):
         nonlocal on_complete_called
-        # The run_ag_ui generator is mocked to yield immediately, bypassing the real on_complete callback
+        # The event stream is mocked to yield immediately, bypassing the real on_complete callback
         on_complete_called = True  # pragma: no cover
         
     deferred_requests = {"tool2": "args"}
     state_dict = {}
     
-    with patch("agent_server.run_ag_ui", side_effect=mock_run_ag_ui):
+    with patch("agent_server.AGUIAdapter", return_value=mock_adapter):
         gen = stream_agent_response(
             token=token,
             run_input=run_input,
@@ -395,10 +423,13 @@ def test_serve_meme():
         if meme_id in generated_memes:
             del generated_memes[meme_id]
 
+from collections.abc import AsyncGenerator
+from typing import cast
+
 from fastapi import Request
+
 from agent_server import events
 
-from typing import AsyncGenerator, cast
 
 @pytest.mark.asyncio
 async def test_events_sse():
@@ -409,7 +440,7 @@ async def test_events_sse():
     assert response.media_type == "text/event-stream"
     
     # Get the async generator from the StreamingResponse
-    gen = cast(AsyncGenerator[str, None], response.body_iterator)
+    gen = cast(AsyncGenerator[str], response.body_iterator)
     
     # 1. First event: agent info
     first_chunk = await anext(gen)
@@ -443,7 +474,7 @@ async def test_events_sse():
 async def test_events_sse_cancelled():
     request = MagicMock(spec=Request)
     response = await events(request)
-    gen = cast(AsyncGenerator[str, None], response.body_iterator)
+    gen = cast(AsyncGenerator[str], response.body_iterator)
     
     first_chunk = await anext(gen)
     data = json.loads(first_chunk.strip()[6:])
@@ -460,7 +491,7 @@ async def test_events_sse_cancelled():
 async def test_events_sse_task_cancellation():
     request = MagicMock(spec=Request)
     response = await events(request)
-    gen = cast(AsyncGenerator[str, None], response.body_iterator)
+    gen = cast(AsyncGenerator[str], response.body_iterator)
     
     first_chunk = await anext(gen)
     data = json.loads(first_chunk.strip()[6:])
@@ -488,8 +519,13 @@ async def test_lifespan():
     class DummyTask:
         def __init__(self):
             self.cancelled = False
+            self.done_callbacks = []
         def cancel(self):
             self.cancelled = True
+        def add_done_callback(self, callback):
+            # lifespan registers background_tasks.discard so the task set does
+            # not leak; record it rather than invoking it.
+            self.done_callbacks.append(callback)
 
     mock_task = DummyTask()
     
@@ -501,8 +537,10 @@ async def test_lifespan():
             # Verify signal handlers were added for SIGTERM and SIGINT
             assert mock_loop.add_signal_handler.call_count == 2
             
-            # Verify ping task was created
+            # Verify ping task was created and registered so it is not GC'd
             mock_create_task.assert_called_once()
+            assert mock_task in background_tasks
+            assert mock_task.done_callbacks == [background_tasks.discard]
             
             # Test the signal handler logic
             handler = mock_loop.add_signal_handler.call_args_list[0][0][1]
@@ -520,6 +558,9 @@ async def test_lifespan():
             
         # Verify ping task was cancelled after yield
         assert mock_task.cancelled
+        # The done callback never fires for a dummy task, so drop it by hand
+        # rather than leaking it into other tests.
+        background_tasks.discard(mock_task)
         
         # Capture the real ping_all_sessions coroutine that was passed to create_task
         # and close it to prevent the "unawaited coroutine" warning.
@@ -527,17 +568,20 @@ async def test_lifespan():
         coro.close()
 
 @pytest.mark.asyncio
-async def test_ping_all_sessions():
+async def test_ping_all_sessions(caplog):
     # Setup mock session
     queue = asyncio.Queue(maxsize=1)
     mock_session = Session(agent=MagicMock(), queue=queue)
     sessions["test_token"] = mock_session
     
     try:
-        # Mock sleep to raise an exception after the first call to break the while True loop
-        with patch("asyncio.sleep", side_effect=[None, Exception("Stop loop")]):
-            with pytest.raises(Exception, match="Stop loop"):
-                await ping_all_sessions()
+        # Mock sleep to raise an exception after the first call to break the while True loop.
+        # ping_all_sessions is a background task: it logs and returns rather than
+        # propagating, so the loop exits without raising.
+        with caplog.at_level(logging.ERROR, logger="agent_server"), \
+             patch("asyncio.sleep", side_effect=[None, Exception("Stop loop")]):
+            await ping_all_sessions()
+        assert "ping_all_sessions failed: Stop loop" in caplog.text
         
         # Verify ping was put in queue
         assert queue.qsize() == 1
@@ -547,9 +591,9 @@ async def test_ping_all_sessions():
         # Test QueueFull branch
         queue.put_nowait({"already": "full"})
         with patch("asyncio.sleep", side_effect=[None, Exception("Stop loop")]):
-            with pytest.raises(Exception, match="Stop loop"):
-                await ping_all_sessions()
+            await ping_all_sessions()
         # Should not raise asyncio.QueueFull due to try-except block
+        assert queue.qsize() == 1
         
     finally:
         # Cleanup
@@ -569,7 +613,7 @@ async def test_make_injector_stream_fn():
             class MockResponse:
                 class MockPart:
                     content = "Mock summary"
-                parts = [MockPart()]
+                parts: ClassVar[list] = [MockPart()]
             return MockResponse()
 
     mock_model = MockModel()
@@ -739,3 +783,73 @@ def test_tool_schema_to_a2ui_boolean():
     assert "Checkbox" in active_field["component"]
     assert active_field["component"]["Checkbox"]["label"] == {"literalString": "active"}
     assert active_field["component"]["Checkbox"]["dataModelKey"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_event_stream_closes_cleanly_on_disconnect():
+    """A client disconnecting mid-stream must not leave a RuntimeError behind.
+
+    Closing the SSE generator while the model stream is still suspended used to
+    surface "RuntimeError: async generator ignored GeneratorExit" from a
+    background task (pydantic-ai <= 2.22, fixed in 2.23). The error never reached
+    the request, so only the loop exception handler catches it.
+    """
+    async def slow_stream(messages, info):
+        # Suspends between deltas so the close lands mid-response.
+        for i in range(50):
+            yield f"chunk-{i} "
+            await asyncio.sleep(0.05)
+
+    agent = Agent[StateDeps[Dependencies], str](
+        FunctionModel(stream_function=slow_stream),
+        deps_type=StateDeps[Dependencies],
+    )
+    # Another test installs a console span exporter globally; opting out keeps
+    # this run's spans out of the test output.
+    agent.instrument = False
+    deps = StateDeps(Dependencies())
+    run_input = RunAgentInput(
+        thread_id="t1", run_id="r1",
+        messages=[UserMessage(id="m1", role="user", content="hi")],
+        tools=[], context=[], state={}, forwarded_props={},
+    )
+
+    loop_errors = []
+    asyncio.get_running_loop().set_exception_handler(
+        lambda _loop, context: loop_errors.append(context)
+    )
+
+    state: dict = {}
+
+    async def event_stream():
+        try:
+            adapter = AGUIAdapter(agent, run_input)
+            state["ag_ui_events"] = adapter.encode_stream(
+                adapter.run_stream(deps=deps)
+            )
+            async for chunk in state["ag_ui_events"]:
+                yield chunk
+        finally:
+            if state.get("ag_ui_events") is not None:
+                await state["ag_ui_events"].aclose()
+
+    gen = event_stream()
+    seen = 0
+    async for _ in gen:
+        seen += 1
+        if seen >= 3:
+            break
+    assert seen == 3
+
+    # Simulate the client going away mid-stream.
+    await gen.aclose()
+    del gen
+    gc.collect()
+    await asyncio.sleep(0.6)
+    gc.collect()
+    await asyncio.sleep(0.2)
+
+    assert loop_errors == [], (
+        "disconnect left background errors: "
+        + "; ".join(repr(c.get("exception")) for c in loop_errors)
+    )

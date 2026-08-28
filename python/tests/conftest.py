@@ -33,7 +33,7 @@ def browser_context_args(browser_context_args: dict[str, Any]) -> dict[str, Any]
 def browser(
     browser_type: BrowserType,
     browser_type_launch_args: dict[str, Any],
-) -> Generator[Browser, None, None]:
+) -> Generator[Browser]:
     """Launch a fresh browser per test (--single-process crashes on reuse)."""
     b = browser_type.launch(**browser_type_launch_args)
     yield b
@@ -44,7 +44,7 @@ def browser(
 def page(
     browser: Browser,
     browser_context_args: dict[str, Any],
-) -> Generator[Page, None, None]:
+) -> Generator[Page]:
     """Create a fresh page per test using the per-test browser."""
     ctx = browser.new_context(**browser_context_args)
     p = ctx.new_page()

@@ -13,23 +13,13 @@ import typing
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from types import FrameType
 from uuid import uuid4
 
 from ag_ui.core import CustomEvent
-from ag_ui.core.types import RunAgentInput, TextInputContent, BinaryInputContent
+from ag_ui.core.types import BinaryInputContent, RunAgentInput, TextInputContent
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
-from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
-from pydantic_ai.ag_ui import run_ag_ui, StateDeps
-from pydantic_ai.messages import ModelMessage, ModelRequest, ToolCallPart, UserPromptPart
-from pydantic_ai.models.function import DeltaToolCall, FunctionModel, AgentInfo
-from pydantic_ai.toolsets import FunctionToolset
-from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
-from simpleeval import simple_eval
-from starlette.responses import StreamingResponse, FileResponse
-
 from opentelemetry import trace
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -38,7 +28,27 @@ from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
     SpanExportResult,
 )
-from pydantic_ai import InstrumentationSettings
+from PIL import Image, ImageDraw, ImageFont
+from pydantic import BaseModel
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    DeferredToolResults,
+    InstrumentationSettings,
+)
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ToolCallPart,
+    UserPromptPart,
+)
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
+from pydantic_ai.models.test import TestModel
+from pydantic_ai.toolsets import FunctionToolset
+from pydantic_ai.ui import StateDeps
+from pydantic_ai.ui.ag_ui import AGUIAdapter
+from simpleeval import simple_eval
+from starlette.responses import FileResponse, StreamingResponse
 
 logger = logging.getLogger("agent_server")
 logger.setLevel(logging.DEBUG)
@@ -186,8 +196,8 @@ def evaluate_expression(expression: str) -> str:
         return str(result)
     except ZeroDivisionError:
         return str(float("inf"))
-    except Exception as e:
-        return f"Error evaluating expression: {str(e)}"
+    except Exception as e:  # noqa: BLE001 - any eval failure is reported to the model as text
+        return f"Error evaluating expression: {e!s}"
 
 
 toolset.add_function(
@@ -297,11 +307,10 @@ toolset.add_function(
 def create_agent() -> Agent[StateDeps[Dependencies], typing.Any]:
     """Create a new agent instance for a session."""
     if os.environ.get("AGUITEST_IS_TEST_SUITE"):
-        from pydantic_ai.models.test import TestModel
         model = TestModel(call_tools=[], custom_output_text="Hello from TestModel!")
         logger.info("Creating agent with TestModel for test suite")
     else:
-        model = "google-gla:gemini-3.1-pro-preview"
+        model = "google:gemini-3.1-pro-preview"
         logger.info(f"Creating agent with model: {model}")
         
     return Agent[StateDeps[Dependencies], typing.Any](
@@ -363,7 +372,7 @@ async def ping_all_sessions():
     """Send a ping to all connected clients every minute, or configured interval."""
     logger.info("Inside ping_all_sessions")
     try:
-        interval = float(os.environ.get("AGUITEST_PING_INTERVAL", 60.0))
+        interval = float(os.environ.get("AGUITEST_PING_INTERVAL", "60.0"))
         logger.info(f"Parsed interval: {interval}")
         while True:
             await asyncio.sleep(interval)
@@ -373,7 +382,7 @@ async def ping_all_sessions():
                     session.queue.put_nowait(ping_event)
                 except asyncio.QueueFull:
                     pass
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - background task must never escape its own failure
         logger.error(f"ping_all_sessions failed: {e}")
 
 
@@ -563,12 +572,13 @@ async def stream_agent_response(
             deps_type=StateDeps[Dependencies],
         )
 
-    state["ag_ui_events"] = run_ag_ui(  # type: ignore[misc]
-        agent,
-        run_input,
-        deferred_tool_results=deferred_tool_results,
-        on_complete=on_complete_callback,
-        deps=deps
+    adapter = AGUIAdapter(agent, run_input)
+    state["ag_ui_events"] = adapter.encode_stream(
+        adapter.run_stream(
+            deferred_tool_results=deferred_tool_results,
+            on_complete=on_complete_callback,
+            deps=deps,
+        )
     )
 
     first_event_seen = False
@@ -684,10 +694,10 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
             logger.info(f"[{token[:8]}] /agent client disconnected")
             raise
         finally:
-            # Close the underlying LLM stream to stop wasting API credits
-            # NOTE: run_ag_ui has a bug where it doesn't handle GeneratorExit cleanly,
-            # causing "RuntimeError: async generator ignored GeneratorExit" in a background task.
-            # TODO: Report bug / patch pydantic_ai
+            # Close the underlying LLM stream to stop wasting API credits.
+            # Through pydantic-ai 2.22 this raised "RuntimeError: async generator
+            # ignored GeneratorExit" in a background task on client disconnect;
+            # fixed in 2.23. See test_event_stream_closes_cleanly_on_disconnect.
             if state.get("ag_ui_events") is not None:
                 await state["ag_ui_events"].aclose()
 

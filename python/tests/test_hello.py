@@ -1,5 +1,3 @@
-import pytest
-from fastapi.testclient import TestClient
 
 # Normally we'd import this from your agent_server
 # from agent_server import app

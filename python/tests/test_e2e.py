@@ -6,7 +6,6 @@ import subprocess
 import time
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 
 import httpx
 import pytest
@@ -33,7 +32,7 @@ def is_frontend_running() -> bool:
         return False
 
 @pytest.fixture(scope="session")
-def servers() -> Generator[None, None, None]:
+def servers() -> Generator[None]:
     """Start backend and frontend servers for e2e tests, or use existing ones."""
     backend = None
     frontend = None
@@ -45,7 +44,9 @@ def servers() -> Generator[None, None, None]:
         print("Backend already running on port 8999, reusing...")
     else:
         print("Starting backend...")
-        backend_log = open("/tmp/aguitest-backend.log", "w")
+        # The handle is passed to Popen and must outlive this statement;
+        # a context manager would close it under the running child.
+        backend_log = open("/tmp/aguitest-backend.log", "w")  # noqa: SIM115
         env = {
             **os.environ, 
             "AGUITEST_PING_INTERVAL": "0.01",
@@ -73,7 +74,8 @@ def servers() -> Generator[None, None, None]:
         print("Frontend already running on port 5173, reusing...")
     else:
         print("Starting frontend...")
-        frontend_log = open("/tmp/aguitest-frontend.log", "w")
+        # Same as the backend log above: owned by the child process.
+        frontend_log = open("/tmp/aguitest-frontend.log", "w")  # noqa: SIM115
         frontend = subprocess.Popen(
             ["npm", "run", "dev"],
             cwd=PROJECT_ROOT,
@@ -108,7 +110,7 @@ def base_url(servers: None) -> str:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_coverage_dir() -> Generator[None, None, None]:
+def setup_coverage_dir() -> Generator[None]:
     """Ensure coverage directory exists."""
     COVERAGE_DIR.mkdir(exist_ok=True)
     yield
@@ -117,7 +119,7 @@ def setup_coverage_dir() -> Generator[None, None, None]:
 @pytest.fixture(autouse=True)
 def collect_coverage(
     page: Page, request: pytest.FixtureRequest
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Collect coverage data after each test."""
     yield
     coverage = page.evaluate("window.__coverage__")

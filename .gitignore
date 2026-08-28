@@ -21,7 +21,6 @@ python/.venv/
 venv/
 ENV/
 env/
-python/uv.lock
 
 # Project directories
 var/

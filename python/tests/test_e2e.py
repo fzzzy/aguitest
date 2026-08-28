@@ -23,6 +23,7 @@ def is_backend_running() -> bool:
     except httpx.RequestError:
         return False
 
+
 def is_frontend_running() -> bool:
     """Check if frontend is running on port 5173."""
     try:
@@ -30,6 +31,7 @@ def is_frontend_running() -> bool:
         return True
     except httpx.RequestError:
         return False
+
 
 @pytest.fixture(scope="session")
 def servers() -> Generator[None]:
@@ -48,12 +50,21 @@ def servers() -> Generator[None]:
         # a context manager would close it under the running child.
         backend_log = open("/tmp/aguitest-backend.log", "w")  # noqa: SIM115
         env = {
-            **os.environ, 
+            **os.environ,
             "AGUITEST_PING_INTERVAL": "0.01",
-            "AGUITEST_IS_TEST_SUITE": "1"
+            "AGUITEST_IS_TEST_SUITE": "1",
         }
         backend = subprocess.Popen(
-            ["uv", "run", "uvicorn", "agent_server:app", "--host", "0.0.0.0", "--port", "8999"],
+            [
+                "uv",
+                "run",
+                "uvicorn",
+                "agent_server:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8999",
+            ],
             cwd=PROJECT_ROOT / "python",
             stdout=backend_log,
             stderr=backend_log,
@@ -103,6 +114,7 @@ def servers() -> Generator[None]:
         backend.terminate()
         backend.wait()
 
+
 @pytest.fixture(scope="session")
 def base_url(servers: None) -> str:
     """Base URL for the frontend server."""
@@ -117,9 +129,7 @@ def setup_coverage_dir() -> Generator[None]:
 
 
 @pytest.fixture(autouse=True)
-def collect_coverage(
-    page: Page, request: pytest.FixtureRequest
-) -> Generator[None]:
+def collect_coverage(page: Page, request: pytest.FixtureRequest) -> Generator[None]:
     """Collect coverage data after each test."""
     yield
     coverage = page.evaluate("window.__coverage__")
@@ -134,48 +144,50 @@ def test_hello_world_success(page: Page, base_url: str) -> None:
     page.goto(base_url)
     # Give the script a moment to attach the global
     page.wait_for_timeout(500)
-    
+
     result = page.evaluate("window.helloWorld('Playwright')")
     assert result == "Hello, Playwright!"
+
 
 def test_hello_world_error(page: Page, base_url: str) -> None:
     """Test the helloWorld function error branch."""
     page.goto(base_url)
     page.wait_for_timeout(500)
-    
+
     with pytest.raises(Exception, match="Invalid name"):
         page.evaluate("window.helloWorld('Error')")
+
 
 def test_chat_interaction(page: Page, base_url: str) -> None:
     """Test connecting to the agent and receiving messages."""
     page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
-    page.goto(base_url)    
+    page.goto(base_url)
     # Wait for the UI to be ready
     chat_container = page.locator("chat-container")
     expect(chat_container).to_be_visible(timeout=5000)
-    
+
     # Check that initial state shows the ping indicator
     ping_indicator = page.locator("ping-indicator")
     expect(ping_indicator).to_be_visible()
-    
+
     # Find the input and send a message to trigger connection
     msg_input = page.locator("message-input input")
     expect(msg_input).to_be_visible()
-    
+
     msg_input.fill("Hello AGUI!")
     msg_input.press("Enter")
-    
+
     # Wait for the user message to appear in the chat
     user_msg = page.locator("chat-message[role='user'] .content")
     expect(user_msg).to_contain_text("Hello AGUI!")
-    
+
     # Wait for the assistant to reply
     assistant_msg = page.locator("chat-message[role='assistant']")
     expect(assistant_msg).to_be_visible(timeout=10000)
-    
+
     # Wait for the stream to finish and some response text to appear
     expect(assistant_msg.locator(".content")).not_to_be_empty(timeout=15000)
-    
+
     # Wait for a ping to arrive (the server sends one every 0.01 seconds now)
     # We check the pingCount property to reliably detect it without fighting CSS animations
     ping_count = page.evaluate("""() => {
@@ -202,32 +214,33 @@ def test_chat_interaction(page: Page, base_url: str) -> None:
     }""")
     assert ping_count > 0, f"Expected ping_count > 0, got {ping_count}"
 
+
 def test_debug_log(page: Page, base_url: str) -> None:
     """Test the debugLog function."""
     page.goto(base_url)
     page.wait_for_timeout(500)
-    
+
     # Enable debug mode
     page.evaluate("window.__DEBUG = true")
-    
+
     # Test debug log with messages div present
     page.evaluate("window.debugLog('Test debug message 1')")
-    
+
     # Verify the debug message was added to the DOM
     debug_msg = page.locator("debug-message", has_text="Test debug message 1")
     expect(debug_msg).to_be_visible()
-    
+
     # Test debug log without messages div (remove it temporarily)
-    page.evaluate('''() => {
+    page.evaluate("""() => {
         const msgs = document.getElementById("messages");
         if (msgs) msgs.id = "messages-hidden";
-    }''')
-    
+    }""")
+
     # Should fallback to console.log (we can't easily assert console.log here but it will cover the code path)
     page.evaluate("window.debugLog('Test debug message 2')")
-    
+
     # Restore messages div to not break other tests
-    page.evaluate('''() => {
+    page.evaluate("""() => {
         const hidden = document.getElementById("messages-hidden");
         if (hidden) hidden.id = "messages";
-    }''')
+    }""")

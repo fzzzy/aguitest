@@ -53,14 +53,16 @@ from starlette.responses import FileResponse, StreamingResponse
 logger = logging.getLogger("agent_server")
 logger.setLevel(logging.DEBUG)
 _handler = logging.StreamHandler()
-_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 logger.addHandler(_handler)
 
 
 DEBUG = False
 
 
-def tool_schema_to_a2ui(tool_name: str, tool: typing.Any) -> list[dict[str, typing.Any]]:
+def tool_schema_to_a2ui(
+    tool_name: str, tool: typing.Any
+) -> list[dict[str, typing.Any]]:
     """Convert a tool's JSON schema into A2UI messages for a form UI."""
     schema = tool.function_schema.json_schema
     properties = schema.get("properties", {})
@@ -110,26 +112,31 @@ def tool_schema_to_a2ui(tool_name: str, tool: typing.Any) -> list[dict[str, typi
     # Add submit button
     submit_id = f"{tool_name}-submit"
     children_ids.append(submit_id)
-    components.append({
-        "id": submit_id,
-        "component": {
-            "Button": {
-                "label": {"literalString": f"Run {tool_name}"},
-                "action": {"name": f"invoke_{tool_name}"},
-            }
-        },
-    })
+    components.append(
+        {
+            "id": submit_id,
+            "component": {
+                "Button": {
+                    "label": {"literalString": f"Run {tool_name}"},
+                    "action": {"name": f"invoke_{tool_name}"},
+                }
+            },
+        }
+    )
 
     # Wrap in a Column
     root_id = f"{tool_name}-form"
-    components.insert(0, {
-        "id": root_id,
-        "component": {
-            "Column": {
-                "children": children_ids,
-            }
+    components.insert(
+        0,
+        {
+            "id": root_id,
+            "component": {
+                "Column": {
+                    "children": children_ids,
+                }
+            },
         },
-    })
+    )
 
     surface_update = {
         "surfaceUpdate": {
@@ -168,6 +175,7 @@ class Dependencies(BaseModel):
 @dataclass
 class Session:
     """Holds state for each connected client session."""
+
     agent: Agent[typing.Any]
     queue: asyncio.Queue[typing.Any]
     current_task: asyncio.Task[typing.Any] | None = None
@@ -212,7 +220,7 @@ def dangerous_tool(text: str) -> str:
     Args:
         text: The text to encrypt with ROT13
     """
-    return codecs.encode(text, 'rot_13')
+    return codecs.encode(text, "rot_13")
 
 
 toolset.add_function(
@@ -231,7 +239,13 @@ MEME_DIR.mkdir(exist_ok=True)
 generated_memes: dict[str, Path] = {}
 
 
-def _draw_meme_text(draw: ImageDraw.ImageDraw, text: str, y: int, width: int, font: ImageFont.FreeTypeFont) -> None:
+def _draw_meme_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    width: int,
+    font: ImageFont.FreeTypeFont,
+) -> None:
     """Draw Impact-style text (white with black outline) centered at y."""
     text = text.upper()
     bbox = draw.textbbox((0, 0), text, font=font)
@@ -283,7 +297,7 @@ toolset.add_function(
 )
 
 
-#model = BedrockConverseModel(
+# model = BedrockConverseModel(
 #    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 #    provider=BedrockProvider(
 #        api_key=os.getenv("AWS_BEARER_TOKEN_BEDROCK"),
@@ -294,15 +308,16 @@ toolset.add_function(
 #            "anthropic_beta": ["context-1m-2025-08-07"]
 #        }
 #    )
-#)
+# )
 #
-#agent = Agent[StateDeps[Dependencies], typing.Any](
+# agent = Agent[StateDeps[Dependencies], typing.Any](
 #    model=model,
 #    instructions=AGENT_INSTRUCTIONS,
 #    toolsets=[toolset],
 #    output_type=[DeferredToolRequests, str],
 #    deps_type=StateDeps[Dependencies],
-#)
+# )
+
 
 def create_agent() -> Agent[StateDeps[Dependencies], typing.Any]:
     """Create a new agent instance for a session."""
@@ -312,7 +327,7 @@ def create_agent() -> Agent[StateDeps[Dependencies], typing.Any]:
     else:
         model = "google:gemini-3.1-pro-preview"
         logger.info(f"Creating agent with model: {model}")
-        
+
     return Agent[StateDeps[Dependencies], typing.Any](
         model,
         system_prompt=AGENT_INSTRUCTIONS,
@@ -337,24 +352,30 @@ def make_injector_stream_fn(
         nonlocal call_count
         call_count += 1
         # Inject a user turn so Gemini sees: user -> tool_call (not model -> tool_call)
-        user_msg = ModelRequest(parts=[UserPromptPart(
-            content=f"The user manually triggered the {tool_name} tool with args: {tool_args}"
-        )])
+        user_msg = ModelRequest(
+            parts=[
+                UserPromptPart(
+                    content=f"The user manually triggered the {tool_name} tool with args: {tool_args}"
+                )
+            ]
+        )
         insert_idx = 1 if len(messages) > 0 else 0
         messages.insert(insert_idx, user_msg)
 
         if call_count == 1:
-            yield {0: DeltaToolCall(
-                name=tool_name,
-                json_args=tool_args,
-                tool_call_id=str(uuid4()),
-            )}
+            yield {
+                0: DeltaToolCall(
+                    name=tool_name,
+                    json_args=tool_args,
+                    tool_call_id=str(uuid4()),
+                )
+            }
         else:
             response = await real_model.request(
                 messages, info.model_settings, info.model_request_parameters
             )
             for part in response.parts:
-                if hasattr(part, 'content'):
+                if hasattr(part, "content"):
                     yield part.content
 
     return injector_stream_fn
@@ -367,6 +388,7 @@ sessions: dict[str, Session] = {}
 
 # Keep strong reference to background tasks
 background_tasks = set()
+
 
 async def ping_all_sessions():
     """Send a ping to all connected clients every minute, or configured interval."""
@@ -410,7 +432,7 @@ async def lifespan(_app: FastAPI):
     ping_task = asyncio.create_task(ping_all_sessions())
     background_tasks.add(ping_task)
     ping_task.add_done_callback(background_tasks.discard)
-    
+
     yield
     ping_task.cancel()
 
@@ -438,11 +460,7 @@ def process_text_attachment(base64_data: str, filename: str) -> TextInputContent
 def process_binary_attachment(
     media_type: str, base64_data: str, filename: str
 ) -> BinaryInputContent:
-    return BinaryInputContent(
-        mime_type=media_type,
-        data=base64_data,
-        filename=filename
-    )
+    return BinaryInputContent(mime_type=media_type, data=base64_data, filename=filename)
 
 
 def process_attachments(run_input: RunAgentInput) -> dict[str, str]:
@@ -559,7 +577,9 @@ async def stream_agent_response(
         attachments_info = process_attachments(run_input)
 
     # Filter tools based on disabled_tools in state
-    disabled_tools = set(run_input.state.get("disabled_tools", [])) if run_input.state else set()
+    disabled_tools = (
+        set(run_input.state.get("disabled_tools", [])) if run_input.state else set()
+    )
     if disabled_tools:
         filtered = toolset.filtered(
             lambda _ctx, tool_def: tool_def.name not in disabled_tools
@@ -594,7 +614,7 @@ async def stream_agent_response(
                 instructions_event = CustomEvent(
                     name="instructions",
                     value=AGENT_INSTRUCTIONS,
-                    timestamp=int(time.time() * 1000)
+                    timestamp=int(time.time() * 1000),
                 )
                 yield f"data: {json.dumps(instructions_event.model_dump())}\n\n"
 
@@ -603,7 +623,7 @@ async def stream_agent_response(
                 attachments_event = CustomEvent(
                     name="attachments",
                     value=attachments_info,
-                    timestamp=int(time.time() * 1000)
+                    timestamp=int(time.time() * 1000),
                 )
                 yield f"data: {json.dumps(attachments_event.model_dump())}\n\n"
 
@@ -616,7 +636,7 @@ async def stream_agent_response(
                 deferred_event = CustomEvent(
                     name="deferred_tool_requests",
                     value=deferred_tool_requests,
-                    timestamp=int(time.time() * 1000)
+                    timestamp=int(time.time() * 1000),
                 )
                 yield f"data: {json.dumps(deferred_event.model_dump())}\n\n"
 
@@ -650,7 +670,7 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
                 if isinstance(part, ToolCallPart):
                     deferred_tool_requests[part.tool_call_id] = {
                         "tool_name": part.tool_name,
-                        "args": part.args
+                        "args": part.args,
                     }
 
     # Check for manual tool call — use FunctionModel to inject a predetermined tool call
@@ -661,7 +681,9 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
             tool_args=json.dumps(manual_call["args"]),
             real_model=session.agent.model,
         )
-        injector_model = FunctionModel(stream_function=stream_fn, model_name="manual-tool-injector")
+        injector_model = FunctionModel(
+            stream_function=stream_fn, model_name="manual-tool-injector"
+        )
         auto_approved_toolset = FunctionToolset()
         for name, tool in toolset.tools.items():
             auto_approved_toolset.add_function(
@@ -672,7 +694,8 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
             )
         agent = Agent[StateDeps[Dependencies], str](
             injector_model,
-            system_prompt=AGENT_INSTRUCTIONS + "\nThe user manually triggered a tool call. Briefly describe the result.",
+            system_prompt=AGENT_INSTRUCTIONS
+            + "\nThe user manually triggered a tool call. Briefly describe the result.",
             toolsets=[auto_approved_toolset],  # type: ignore[list-item]
             output_type=str,
             deps_type=StateDeps[Dependencies],
@@ -686,8 +709,13 @@ async def agent_run(request: Request, run_input: RunAgentInput, token: str):
     async def event_stream():
         try:
             async for chunk in stream_agent_response(
-                token, run_input, agent, deps,
-                on_complete_callback, deferred_tool_requests, state
+                token,
+                run_input,
+                agent,
+                deps,
+                on_complete_callback,
+                deferred_tool_requests,
+                state,
             ):
                 yield chunk
         except asyncio.CancelledError:

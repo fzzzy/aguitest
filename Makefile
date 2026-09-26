@@ -41,15 +41,16 @@ fix: python/aguitest-venv node_modules
 	npx prettier --write src/*.ts
 
 run: node_modules python/aguitest-venv
+	@mkdir -p var/log
 	@# Stop any existing processes
 	@lsof -ti:5173 | xargs kill 2>/dev/null || true
 	@lsof -ti:8999 | xargs kill 2>/dev/null || true
 	@sleep 1
 	@# Start backend
-	@cd python && uv run uvicorn agent_server:app --host 0.0.0.0 --port 8999 --reload > /tmp/aguitest-backend.log 2>&1 &
+	@cd python && uv run uvicorn agent_server:app --host 0.0.0.0 --port 8999 --reload > $(CURDIR)/var/log/backend.log 2>&1 &
 	@sleep 1
 	@# Start frontend
-	@npm run dev > /tmp/aguitest-frontend.log 2>&1 &
+	@npm run dev > $(CURDIR)/var/log/frontend.log 2>&1 &
 	@sleep 2
 	@echo ""
 	@echo "Started:"
@@ -69,7 +70,7 @@ stop:
 	@echo "Stopped."
 
 tail:
-	@tail -f /tmp/aguitest-backend.log /tmp/aguitest-frontend.log
+	@tail -f $(CURDIR)/var/log/backend.log $(CURDIR)/var/log/frontend.log
 
 dev: run tail
 

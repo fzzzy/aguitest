@@ -13,6 +13,8 @@ from playwright.sync_api import Page, expect
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 COVERAGE_DIR = PROJECT_ROOT / ".nyc_output"
+# Where `make run` logs the same two servers, when it is the one running them.
+LOG_DIR = PROJECT_ROOT / "var" / "log"
 
 
 def is_backend_running() -> bool:
@@ -48,7 +50,8 @@ def servers() -> Generator[None]:
         print("Starting backend...")
         # The handle is passed to Popen and must outlive this statement;
         # a context manager would close it under the running child.
-        backend_log = open("/tmp/aguitest-backend.log", "w")  # noqa: SIM115
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        backend_log = open(LOG_DIR / "backend.log", "w")  # noqa: SIM115
         env = {
             **os.environ,
             "AGUITEST_PING_INTERVAL": "0.01",
@@ -86,7 +89,8 @@ def servers() -> Generator[None]:
     else:
         print("Starting frontend...")
         # Same as the backend log above: owned by the child process.
-        frontend_log = open("/tmp/aguitest-frontend.log", "w")  # noqa: SIM115
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        frontend_log = open(LOG_DIR / "frontend.log", "w")  # noqa: SIM115
         frontend = subprocess.Popen(
             ["npm", "run", "dev"],
             cwd=PROJECT_ROOT,

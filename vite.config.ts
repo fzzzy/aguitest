@@ -50,6 +50,13 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    // The page's console in this server's output, and so in var/log: every
+    // level, and uncaught errors. Vite turns this on by itself only when it
+    // thinks an AI agent started it, and then for warnings and errors only.
+    forwardConsole: {
+      unhandledErrors: true,
+      logLevels: ['error', 'warn', 'info', 'log', 'debug'],
+    },
     host: '0.0.0.0',
     allowedHosts: true,
     proxy: {
